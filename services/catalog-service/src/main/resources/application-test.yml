@@ -1,0 +1,7 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/eventcart_catalog_test
+  kafka:
+    bootstrap-servers: localhost:9092
+
