@@ -20,6 +20,7 @@ OpenAPI gives us:
 | Cart Service | `http://localhost:8082/swagger-ui.html` | `http://localhost:8082/v3/api-docs` |
 | Order Service | `http://localhost:8083/swagger-ui.html` | `http://localhost:8083/v3/api-docs` |
 | Inventory Service | `http://localhost:8084/swagger-ui.html` | `http://localhost:8084/v3/api-docs` |
+| Payment Service | `http://localhost:8085/swagger-ui.html` | `http://localhost:8085/v3/api-docs` |
 
 ## Catalog APIs
 
@@ -71,7 +72,7 @@ Place order request:
 
 `idempotencyKey` is optional, but recommended. It lets a frontend or API client retry the same order request without accidentally creating a duplicate order.
 
-After the order is created, order-service returns the order with status `CREATED`. inventory-service processes the Kafka event asynchronously, then order-service updates the order to `INVENTORY_RESERVED` or `INVENTORY_FAILED`.
+After the order is created, order-service returns the order with status `CREATED`. inventory-service processes the Kafka event asynchronously, payment-service reacts after inventory is reserved, and order-service updates the order to `INVENTORY_RESERVED`, `INVENTORY_FAILED`, `PAYMENT_COMPLETED`, or `PAYMENT_FAILED`.
 
 ## Inventory APIs
 
@@ -90,6 +91,20 @@ Seed inventory request:
   "availableQuantity": 25
 }
 ```
+
+## Payment APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/payments/orders/{orderId}` | Get payment attempt for an order |
+
+Payment attempt lookup:
+
+```bash
+curl http://localhost:8085/api/v1/payments/orders/<order-id>
+```
+
+payment-service creates the payment attempt asynchronously after it consumes `InventoryReservedEvent`.
 
 ## Run Services Locally
 
@@ -123,6 +138,12 @@ Run inventory-service in another terminal:
 .\mvnw.cmd -pl services/inventory-service spring-boot:run
 ```
 
+Run payment-service in another terminal:
+
+```powershell
+.\mvnw.cmd -pl services/payment-service spring-boot:run
+```
+
 ## Interview Notes
 
 You should be able to explain:
@@ -135,3 +156,4 @@ You should be able to explain:
 - OpenAPI does not replace tests; it documents the contract, while tests verify behavior.
 - API documentation should show service boundaries clearly. In this flow, clients do not send product price to cart-service.
 - OpenAPI examples should demonstrate operationally safer requests, such as order placement with an `idempotencyKey`.
+- Some APIs are lookup-only because their data is created asynchronously from Kafka events, such as payment attempts.

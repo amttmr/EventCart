@@ -46,7 +46,7 @@ EventCart will be developed as a Maven multi-module project:
 | API Gateway | Single entry point for client APIs |
 | Catalog Service | Products, categories, search, inventory-facing product metadata |
 | Cart Service | Customer shopping cart |
-| Order Service | Order placement, order snapshots, Redis idempotency, and inventory-driven status updates |
+| Order Service | Order placement, order snapshots, Redis idempotency, and inventory/payment-driven status updates |
 | Inventory Service | Stock reservation and inventory reservation result events |
 | Payment Service | Payment simulation and payment events |
 | Notification Service | Email/SMS-style async notifications |
@@ -60,8 +60,8 @@ EventCart will be developed as a Maven multi-module project:
 4. Order Service publishes `OrderCreated`.
 5. Inventory Service consumes `OrderCreated`, reserves stock, and publishes `InventoryReserved` or `InventoryReservationFailed`.
 6. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
-7. Payment Service processes payment and publishes `PaymentCompleted` or `PaymentFailed`.
-8. Order Service updates final payment/order status.
+7. Payment Service consumes `InventoryReserved`, simulates payment, and publishes `PaymentCompleted` or `PaymentFailed`.
+8. Order Service consumes payment result events and updates final payment/order status.
 9. Notification Service sends customer updates asynchronously.
 
 ## Learning Promise

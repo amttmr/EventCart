@@ -74,6 +74,8 @@ public class InventoryMapper {
                 reservation.getCustomerId(),
                 reservation.getStatus(),
                 reservation.getItems().stream().map(this::toReservationItemResponse).toList(),
+                reservation.getTotalAmount(),
+                reservation.getCurrency(),
                 reservation.getFailureReason(),
                 reservation.getVersion(),
                 reservation.getCreatedAt(),
@@ -92,7 +94,9 @@ public class InventoryMapper {
                 EventMetadata.create(InventoryReservedEvent.EVENT_TYPE, InventoryReservedEvent.VERSION, reservation.getOrderId()),
                 reservation.getOrderId(),
                 reservation.getCustomerId(),
-                reservation.getItems().stream().map(this::toInventoryReservedItem).toList()
+                reservation.getItems().stream().map(this::toInventoryReservedItem).toList(),
+                reservation.getTotalAmount(),
+                reservation.getCurrency()
         );
     }
 

@@ -1,0 +1,21 @@
+spring:
+  mongodb:
+    uri: mongodb://localhost:27017/eventcart_payment_test
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: payment-service-test
+
+eventcart:
+  payment:
+    simulation:
+      provider-name: MockPay
+      failure-amount-threshold: 50000.00
+  kafka:
+    topics:
+      inventory-reserved: eventcart.inventory.reserved
+      payment-completed: eventcart.payments.completed
+      payment-failed: eventcart.payments.failed

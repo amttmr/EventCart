@@ -50,6 +50,8 @@ class InventoryMapperTest {
         reservation.setCustomerId("customer-1");
         reservation.setStatus(InventoryReservationStatus.RESERVED);
         reservation.setItems(List.of(new InventoryReservationItemDocument("product-1", "SKU-1", 2)));
+        reservation.setTotalAmount(new BigDecimal("13998.00"));
+        reservation.setCurrency("INR");
 
         InventoryReservedEvent event = inventoryMapper.toInventoryReservedEvent(reservation);
 
@@ -57,6 +59,8 @@ class InventoryMapperTest {
         assertThat(event.orderId()).isEqualTo("order-1");
         assertThat(event.items()).hasSize(1);
         assertThat(event.items().getFirst().quantity()).isEqualTo(2);
+        assertThat(event.totalAmount()).isEqualByComparingTo("13998.00");
+        assertThat(event.currency()).isEqualTo("INR");
     }
 
     /**

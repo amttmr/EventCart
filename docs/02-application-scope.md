@@ -38,11 +38,9 @@ This document defines what EventCart will do, who uses it, and how the main work
   - `CREATED`
   - `INVENTORY_RESERVED`
   - `INVENTORY_FAILED`
-  - `PAYMENT_PENDING`
   - `PAYMENT_COMPLETED`
   - `PAYMENT_FAILED`
-  - `CONFIRMED`
-  - `CANCELLED`
+  - Future: `CONFIRMED`, `CANCELLED`
 - Expose APIs to view order details and order history.
 
 ### Inventory
@@ -58,7 +56,7 @@ This document defines what EventCart will do, who uses it, and how the main work
 - Simulate payment processing.
 - Support success and failure scenarios.
 - Publish payment events.
-- Demonstrate retries and dead-letter topics.
+- Demonstrate idempotent event consumption now; retries and dead-letter topics later.
 
 ### Notification
 
@@ -86,9 +84,11 @@ This document defines what EventCart will do, who uses it, and how the main work
 
 | Topic | Producer | Consumers |
 | --- | --- | --- |
-| `order.events` | Order Service | Inventory Service, Notification Service |
-| `inventory.events` | Inventory Service | Order Service, Payment Service, Notification Service |
-| `payment.events` | Payment Service | Order Service, Notification Service |
+| `eventcart.orders.created` | Order Service | Inventory Service |
+| `eventcart.inventory.reserved` | Inventory Service | Order Service, Payment Service |
+| `eventcart.inventory.failed` | Inventory Service | Order Service, future Notification Service |
+| `eventcart.payments.completed` | Payment Service | Order Service, future Notification Service |
+| `eventcart.payments.failed` | Payment Service | Order Service, future Notification Service |
 | `notification.events` | Multiple services | Notification Service |
 | `dead-letter.events` | Error handlers | Developers/Admin diagnostics |
 
@@ -151,4 +151,3 @@ http://localhost:8083/swagger-ui.html
 | 12 | Add observability with Actuator, Prometheus, Grafana, OpenTelemetry |
 | 13 | Add Kubernetes manifests |
 | 14 | Prepare interview notes and architecture explanation |
-

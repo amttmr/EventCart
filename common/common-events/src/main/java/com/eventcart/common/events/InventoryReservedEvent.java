@@ -1,5 +1,6 @@
 package com.eventcart.common.events;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -9,13 +10,17 @@ import java.util.List;
  * @param orderId order ID whose stock was reserved
  * @param customerId customer that placed the order
  * @param items reserved item quantities
+ * @param totalAmount order amount that should be charged by payment-service
+ * @param currency order currency code
  */
 public record InventoryReservedEvent(
         EventMetadata metadata,
         String orderId,
         String customerId,
-        List<InventoryReservedItem> items
+        List<InventoryReservedItem> items,
+        BigDecimal totalAmount,
+        String currency
 ) {
     public static final String EVENT_TYPE = "inventory.reserved";
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 }

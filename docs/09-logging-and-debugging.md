@@ -37,6 +37,8 @@ logging:
 | Failed inventory | `Reservation stock check failed`, `Inventory reservation failed`, `Publishing InventoryReservationFailed event` |
 | Order status update | `Consumed InventoryReserved event`, `Order status updated after inventory reservation`, `Cart clear completed` |
 | Order failure update | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
+| Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
+| Final order payment update | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
 
 ## Debug Redis Idempotency
 

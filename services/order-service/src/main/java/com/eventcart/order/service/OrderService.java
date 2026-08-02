@@ -2,6 +2,8 @@ package com.eventcart.order.service;
 
 import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.events.PaymentCompletedEvent;
+import com.eventcart.common.events.PaymentFailedEvent;
 import com.eventcart.order.client.CartClient;
 import com.eventcart.order.client.CartResponse;
 import com.eventcart.order.domain.OrderDocument;
@@ -106,10 +108,17 @@ public class OrderService {
         orderRepository.findById(event.orderId()).ifPresentOrElse(order -> {
             if (order.getStatus() == OrderStatus.INVENTORY_RESERVED) {
                 log.info("Ignoring duplicate inventory reserved event orderId={}", event.orderId());
+                clearCartAfterReservation(event.customerId(), event.orderId());
                 return;
             }
             if (order.getStatus() == OrderStatus.INVENTORY_FAILED) {
                 log.warn("Ignoring inventory reserved event because order is already failed orderId={}", event.orderId());
+                return;
+            }
+            if (order.getStatus() == OrderStatus.PAYMENT_COMPLETED || order.getStatus() == OrderStatus.PAYMENT_FAILED) {
+                log.info("Inventory reserved event arrived after payment result; keeping final status orderId={} status={}",
+                        event.orderId(), order.getStatus());
+                clearCartAfterReservation(event.customerId(), event.orderId());
                 return;
             }
 
@@ -139,6 +148,11 @@ public class OrderService {
                 log.warn("Ignoring inventory failed event because order is already reserved orderId={}", event.orderId());
                 return;
             }
+            if (order.getStatus() == OrderStatus.PAYMENT_COMPLETED || order.getStatus() == OrderStatus.PAYMENT_FAILED) {
+                log.warn("Ignoring inventory failed event because order already has payment result orderId={} status={}",
+                        event.orderId(), order.getStatus());
+                return;
+            }
 
             order.setStatus(OrderStatus.INVENTORY_FAILED);
             order.setStatusReason(event.reason());
@@ -146,6 +160,60 @@ public class OrderService {
             log.info("Order status updated after inventory failure orderId={} status={} reason={}",
                     event.orderId(), OrderStatus.INVENTORY_FAILED, event.reason());
         }, () -> log.warn("Inventory failed event ignored because order was not found orderId={}", event.orderId()));
+    }
+
+    /**
+     * Applies a successful payment event to an order.
+     *
+     * @param event Kafka event published by payment-service
+     */
+    public void markPaymentCompleted(PaymentCompletedEvent event) {
+        log.info("Applying payment completion orderId={} paymentId={} amount={} currency={}",
+                event.orderId(), event.paymentId(), event.amount(), event.currency());
+        orderRepository.findById(event.orderId()).ifPresentOrElse(order -> {
+            if (order.getStatus() == OrderStatus.PAYMENT_COMPLETED) {
+                log.info("Ignoring duplicate payment completed event orderId={}", event.orderId());
+                return;
+            }
+            if (order.getStatus() == OrderStatus.PAYMENT_FAILED || order.getStatus() == OrderStatus.INVENTORY_FAILED) {
+                log.warn("Ignoring payment completed event because order is already in terminal failure state orderId={} status={}",
+                        event.orderId(), order.getStatus());
+                return;
+            }
+
+            order.setStatus(OrderStatus.PAYMENT_COMPLETED);
+            order.setStatusReason(null);
+            orderRepository.save(order);
+            log.info("Order status updated after payment completion orderId={} status={} paymentId={}",
+                    event.orderId(), OrderStatus.PAYMENT_COMPLETED, event.paymentId());
+        }, () -> log.warn("Payment completed event ignored because order was not found orderId={}", event.orderId()));
+    }
+
+    /**
+     * Applies a failed payment event to an order.
+     *
+     * @param event Kafka event published by payment-service
+     */
+    public void markPaymentFailed(PaymentFailedEvent event) {
+        log.info("Applying payment failure orderId={} paymentId={} reason={}",
+                event.orderId(), event.paymentId(), event.reason());
+        orderRepository.findById(event.orderId()).ifPresentOrElse(order -> {
+            if (order.getStatus() == OrderStatus.PAYMENT_FAILED) {
+                log.info("Ignoring duplicate payment failed event orderId={}", event.orderId());
+                return;
+            }
+            if (order.getStatus() == OrderStatus.PAYMENT_COMPLETED || order.getStatus() == OrderStatus.INVENTORY_FAILED) {
+                log.warn("Ignoring payment failed event because order is already in terminal state orderId={} status={}",
+                        event.orderId(), order.getStatus());
+                return;
+            }
+
+            order.setStatus(OrderStatus.PAYMENT_FAILED);
+            order.setStatusReason(event.reason());
+            orderRepository.save(order);
+            log.info("Order status updated after payment failure orderId={} status={} reason={}",
+                    event.orderId(), OrderStatus.PAYMENT_FAILED, event.reason());
+        }, () -> log.warn("Payment failed event ignored because order was not found orderId={}", event.orderId()));
     }
 
     /**

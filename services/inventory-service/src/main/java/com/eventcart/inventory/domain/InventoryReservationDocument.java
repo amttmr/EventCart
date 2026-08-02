@@ -7,6 +7,7 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,10 @@ public class InventoryReservationDocument {
     private InventoryReservationStatus status;
 
     private List<InventoryReservationItemDocument> items = new ArrayList<>();
+
+    private BigDecimal totalAmount;
+
+    private String currency;
 
     private String failureReason;
 
@@ -129,6 +134,42 @@ public class InventoryReservationDocument {
      */
     public void setItems(List<InventoryReservationItemDocument> items) {
         this.items = items == null ? new ArrayList<>() : new ArrayList<>(items);
+    }
+
+    /**
+     * Returns the order amount related to this reservation.
+     *
+     * @return order amount
+     */
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    /**
+     * Sets the order amount related to this reservation.
+     *
+     * @param totalAmount order amount
+     */
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    /**
+     * Returns the order currency related to this reservation.
+     *
+     * @return currency code
+     */
+    public String getCurrency() {
+        return currency;
+    }
+
+    /**
+     * Sets the order currency related to this reservation.
+     *
+     * @param currency currency code
+     */
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     /**

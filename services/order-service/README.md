@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, publishes an `OrderCreated` Kafka event, consumes inventory result events, updates order status, and clears the cart after successful inventory reservation.
+This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, publishes an `OrderCreated` Kafka event, consumes inventory and payment result events, updates order status, and clears the cart after successful inventory reservation.
 
 ## Current Functionality
 
@@ -16,7 +16,8 @@ This service creates an order from the customer's cart. It calls cart-service, s
 | Order snapshot | Stores cart item snapshots inside the order document |
 | Kafka producer | Publishes `OrderCreatedEvent` to the `eventcart.orders.created` topic |
 | Kafka consumers | Consumes `InventoryReservedEvent` and `InventoryReservationFailedEvent` |
-| Order status updates | Moves orders from `CREATED` to `INVENTORY_RESERVED` or `INVENTORY_FAILED` |
+| Payment consumers | Consumes `PaymentCompletedEvent` and `PaymentFailedEvent` |
+| Order status updates | Moves orders from `CREATED` to inventory and payment result states |
 | Cart cleanup | Clears the customer's cart after inventory has been reserved |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
@@ -46,6 +47,8 @@ This service creates an order from the customer's cart. It calls cart-service, s
 | `eventcart.orders.created` | Produces | Notifies inventory-service that an order exists |
 | `eventcart.inventory.reserved` | Consumes | Updates order status to `INVENTORY_RESERVED` |
 | `eventcart.inventory.failed` | Consumes | Updates order status to `INVENTORY_FAILED` with a reason |
+| `eventcart.payments.completed` | Consumes | Updates order status to `PAYMENT_COMPLETED` |
+| `eventcart.payments.failed` | Consumes | Updates order status to `PAYMENT_FAILED` with a reason |
 
 ## Redis Usage
 
@@ -68,4 +71,4 @@ The local TTL is configured as `30m` in `application.yml`.
 
 ## Interview Angle
 
-This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Redis idempotency, Kafka event publishing and consumption, eventual consistency, and the consistency risk of saving to MongoDB and publishing to Kafka without an outbox pattern.
+This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Redis idempotency, Kafka event publishing and consumption, eventual consistency, payment/inventory event choreography, and the consistency risk of saving to MongoDB and publishing to Kafka without an outbox pattern.

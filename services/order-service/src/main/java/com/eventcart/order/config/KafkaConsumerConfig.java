@@ -2,6 +2,8 @@ package com.eventcart.order.config;
 
 import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.events.PaymentCompletedEvent;
+import com.eventcart.common.events.PaymentFailedEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -96,6 +98,80 @@ public class KafkaConsumerConfig {
     }
 
     /**
+     * Creates a consumer factory for completed payment events.
+     *
+     * @param bootstrapServers Kafka bootstrap server list
+     * @param groupId Kafka consumer group ID
+     * @param autoOffsetReset offset reset strategy for new consumer groups
+     * @return consumer factory for payment-completed events
+     */
+    @Bean
+    public ConsumerFactory<String, PaymentCompletedEvent> paymentCompletedConsumerFactory(
+            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+            @Value("${spring.kafka.consumer.group-id}") String groupId,
+            @Value("${spring.kafka.consumer.auto-offset-reset:earliest}") String autoOffsetReset
+    ) {
+        return new DefaultKafkaConsumerFactory<>(
+                consumerProperties(bootstrapServers, groupId, autoOffsetReset),
+                new StringDeserializer(),
+                paymentCompletedDeserializer()
+        );
+    }
+
+    /**
+     * Creates a listener container factory for payment-completed events.
+     *
+     * @param consumerFactory consumer factory for payment-completed events
+     * @return Kafka listener container factory
+     */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> paymentCompletedKafkaListenerContainerFactory(
+            @Qualifier("paymentCompletedConsumerFactory") ConsumerFactory<String, PaymentCompletedEvent> consumerFactory
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        return factory;
+    }
+
+    /**
+     * Creates a consumer factory for failed payment events.
+     *
+     * @param bootstrapServers Kafka bootstrap server list
+     * @param groupId Kafka consumer group ID
+     * @param autoOffsetReset offset reset strategy for new consumer groups
+     * @return consumer factory for payment-failed events
+     */
+    @Bean
+    public ConsumerFactory<String, PaymentFailedEvent> paymentFailedConsumerFactory(
+            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+            @Value("${spring.kafka.consumer.group-id}") String groupId,
+            @Value("${spring.kafka.consumer.auto-offset-reset:earliest}") String autoOffsetReset
+    ) {
+        return new DefaultKafkaConsumerFactory<>(
+                consumerProperties(bootstrapServers, groupId, autoOffsetReset),
+                new StringDeserializer(),
+                paymentFailedDeserializer()
+        );
+    }
+
+    /**
+     * Creates a listener container factory for payment-failed events.
+     *
+     * @param consumerFactory consumer factory for payment-failed events
+     * @return Kafka listener container factory
+     */
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedKafkaListenerContainerFactory(
+            @Qualifier("paymentFailedConsumerFactory") ConsumerFactory<String, PaymentFailedEvent> consumerFactory
+    ) {
+        ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        return factory;
+    }
+
+    /**
      * Builds common Kafka consumer configuration properties.
      *
      * @param bootstrapServers Kafka bootstrap server list
@@ -132,6 +208,32 @@ public class KafkaConsumerConfig {
     private JacksonJsonDeserializer<InventoryReservationFailedEvent> inventoryFailedDeserializer() {
         JacksonJsonDeserializer<InventoryReservationFailedEvent> deserializer =
                 new JacksonJsonDeserializer<>(InventoryReservationFailedEvent.class);
+        deserializer.addTrustedPackages("com.eventcart.common.events");
+        deserializer.setRemoveTypeHeaders(false);
+        return deserializer;
+    }
+
+    /**
+     * Creates a JSON deserializer for payment-completed events.
+     *
+     * @return configured event deserializer
+     */
+    private JacksonJsonDeserializer<PaymentCompletedEvent> paymentCompletedDeserializer() {
+        JacksonJsonDeserializer<PaymentCompletedEvent> deserializer =
+                new JacksonJsonDeserializer<>(PaymentCompletedEvent.class);
+        deserializer.addTrustedPackages("com.eventcart.common.events");
+        deserializer.setRemoveTypeHeaders(false);
+        return deserializer;
+    }
+
+    /**
+     * Creates a JSON deserializer for payment-failed events.
+     *
+     * @return configured event deserializer
+     */
+    private JacksonJsonDeserializer<PaymentFailedEvent> paymentFailedDeserializer() {
+        JacksonJsonDeserializer<PaymentFailedEvent> deserializer =
+                new JacksonJsonDeserializer<>(PaymentFailedEvent.class);
         deserializer.addTrustedPackages("com.eventcart.common.events");
         deserializer.setRemoveTypeHeaders(false);
         return deserializer;

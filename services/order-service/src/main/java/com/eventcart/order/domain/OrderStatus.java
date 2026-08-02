@@ -6,5 +6,7 @@ package com.eventcart.order.domain;
 public enum OrderStatus {
     CREATED,
     INVENTORY_RESERVED,
-    INVENTORY_FAILED
+    INVENTORY_FAILED,
+    PAYMENT_COMPLETED,
+    PAYMENT_FAILED
 }

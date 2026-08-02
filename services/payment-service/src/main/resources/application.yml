@@ -1,0 +1,63 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: payment-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_payment?authSource=admin
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: payment-service
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: payment-service
+    description: Payment simulation service for EventCart
+
+logging:
+  level:
+    com.eventcart: INFO
+
+eventcart:
+  payment:
+    simulation:
+      provider-name: MockPay
+      failure-amount-threshold: 50000.00
+  kafka:
+    topics:
+      inventory-reserved: eventcart.inventory.reserved
+      payment-completed: eventcart.payments.completed
+      payment-failed: eventcart.payments.failed

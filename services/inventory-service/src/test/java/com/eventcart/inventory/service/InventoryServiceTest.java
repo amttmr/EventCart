@@ -58,6 +58,8 @@ class InventoryServiceTest {
 
         assertThat(response.status()).isEqualTo(InventoryReservationStatus.RESERVED);
         assertThat(response.items()).hasSize(1);
+        assertThat(response.totalAmount()).isEqualByComparingTo("13998.00");
+        assertThat(response.currency()).isEqualTo("INR");
         assertThat(stock.getAvailableQuantity()).isEqualTo(3);
         assertThat(stock.getReservedQuantity()).isEqualTo(2);
         verify(eventPublisher).publishInventoryReserved(any());

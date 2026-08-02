@@ -4,6 +4,8 @@ import com.eventcart.common.events.EventMetadata;
 import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
 import com.eventcart.common.events.InventoryReservedItem;
+import com.eventcart.common.events.PaymentCompletedEvent;
+import com.eventcart.common.events.PaymentFailedEvent;
 import com.eventcart.order.client.CartClient;
 import com.eventcart.order.client.CartItemResponse;
 import com.eventcart.order.client.CartResponse;
@@ -101,7 +103,9 @@ class OrderServiceTest {
                 EventMetadata.create(InventoryReservedEvent.EVENT_TYPE, InventoryReservedEvent.VERSION, "order-1"),
                 "order-1",
                 "customer-1",
-                List.of(new InventoryReservedItem("product-1", "SKU-1", 1))
+                List.of(new InventoryReservedItem("product-1", "SKU-1", 1)),
+                new BigDecimal("6999.00"),
+                "INR"
         ));
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.INVENTORY_RESERVED);
@@ -130,6 +134,56 @@ class OrderServiceTest {
         assertThat(order.getStatusReason()).isEqualTo("Insufficient stock for SKU-1");
         verify(orderRepository).save(order);
         verify(cartClient, never()).clearCart("customer-1");
+    }
+
+    /**
+     * Verifies that successful payment updates the order to a final paid status.
+     */
+    @Test
+    void markPaymentCompletedShouldUpdateStatus() {
+        OrderDocument order = order();
+        order.setStatus(OrderStatus.INVENTORY_RESERVED);
+        when(orderRepository.findById("order-1")).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.markPaymentCompleted(new PaymentCompletedEvent(
+                EventMetadata.create(PaymentCompletedEvent.EVENT_TYPE, PaymentCompletedEvent.VERSION, "order-1"),
+                "payment-1",
+                "order-1",
+                "customer-1",
+                new BigDecimal("6999.00"),
+                "INR",
+                "MockPay-transaction-1"
+        ));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_COMPLETED);
+        assertThat(order.getStatusReason()).isNull();
+        verify(orderRepository).save(order);
+    }
+
+    /**
+     * Verifies that failed payment updates the order status and reason.
+     */
+    @Test
+    void markPaymentFailedShouldUpdateStatusReason() {
+        OrderDocument order = order();
+        order.setStatus(OrderStatus.INVENTORY_RESERVED);
+        when(orderRepository.findById("order-1")).thenReturn(Optional.of(order));
+        when(orderRepository.save(order)).thenReturn(order);
+
+        orderService.markPaymentFailed(new PaymentFailedEvent(
+                EventMetadata.create(PaymentFailedEvent.EVENT_TYPE, PaymentFailedEvent.VERSION, "order-1"),
+                "payment-1",
+                "order-1",
+                "customer-1",
+                new BigDecimal("6999.00"),
+                "INR",
+                "Mock payment declined"
+        ));
+
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        assertThat(order.getStatusReason()).isEqualTo("Mock payment declined");
+        verify(orderRepository).save(order);
     }
 
     /**

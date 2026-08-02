@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-This service consumes `OrderCreatedEvent` from Kafka, checks local inventory stock in MongoDB, reserves stock when possible, and publishes either `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
+This service consumes `OrderCreatedEvent` from Kafka, checks local inventory stock in MongoDB, reserves stock when possible, and publishes either `InventoryReservedEvent` or `InventoryReservationFailedEvent`. Successful reservation events include the order amount and currency so payment-service can simulate payment without calling order-service.
 
 ## Current Functionality
 
@@ -15,6 +15,7 @@ This service consumes `OrderCreatedEvent` from Kafka, checks local inventory sto
 | Reserve stock | Decreases available quantity and increases reserved quantity |
 | Reservation result | Stores reservation outcome in MongoDB |
 | Kafka producer | Publishes `InventoryReservedEvent` or `InventoryReservationFailedEvent` |
+| Payment handoff | Includes amount and currency on `InventoryReservedEvent` for payment-service |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs

@@ -16,7 +16,7 @@ Use this document when you need to:
 
 ## Current Scope
 
-The current working slice covers product catalog, cart, order placement, inventory reservation, Redis idempotency, and Kafka-based order status updates.
+The current working slice covers product catalog, cart, order placement, inventory reservation, payment simulation, Redis idempotency, and Kafka-based order status updates.
 
 | Area | Current state |
 | --- | --- |
@@ -24,7 +24,8 @@ The current working slice covers product catalog, cart, order placement, invento
 | Cart | Add, update, remove, clear, and read customer carts |
 | Orders | Place order from cart, store order snapshot, publish `OrderCreatedEvent` |
 | Inventory | Seed stock, consume order events, reserve stock, publish reservation result events |
-| Order status | Consume inventory result events and update order status |
+| Payments | Consume inventory success events, simulate payment, publish payment result events |
+| Order status | Consume inventory and payment result events and update order status |
 | Redis | Store order idempotency keys for safe order-placement retries |
 | OpenAPI | Swagger UI available for all implemented services |
 
@@ -36,6 +37,7 @@ The current working slice covers product catalog, cart, order placement, invento
 | cart-service | 8082 | Owns customer cart state | MongoDB `eventcart_cart.carts` |
 | order-service | 8083 | Owns order lifecycle | MongoDB `eventcart_order.orders`, Redis idempotency keys |
 | inventory-service | 8084 | Owns stock and reservations | MongoDB `eventcart_inventory.inventory_items`, `eventcart_inventory.inventory_reservations` |
+| payment-service | 8085 | Owns mock payment attempts | MongoDB `eventcart_payment.payment_attempts` |
 | MongoDB | 27017 | Local document database | Docker container `eventcart-mongodb` |
 | Kafka | 9092 | Local event broker | Docker container `eventcart-kafka` |
 | Redis | 6379 | Local cache/key-value store | Docker container `eventcart-redis` |
@@ -59,6 +61,12 @@ flowchart TD
     L --> N["inventory-service publishes InventoryReservationFailedEvent"]
     M --> O["order-service updates order to INVENTORY_RESERVED"]
     O --> P["order-service clears cart"]
+    M --> R["payment-service simulates payment"]
+    R --> S{"Payment accepted?"}
+    S -->|Yes| T["payment-service publishes PaymentCompletedEvent"]
+    S -->|No| U["payment-service publishes PaymentFailedEvent"]
+    T --> V["order-service updates order to PAYMENT_COMPLETED"]
+    U --> W["order-service updates order to PAYMENT_FAILED"]
     N --> Q["order-service updates order to INVENTORY_FAILED"]
 ```
 
@@ -89,9 +97,10 @@ Start services in separate terminals, in this order:
 .\mvnw.cmd -pl services/cart-service spring-boot:run
 .\mvnw.cmd -pl services/order-service spring-boot:run
 .\mvnw.cmd -pl services/inventory-service spring-boot:run
+.\mvnw.cmd -pl services/payment-service spring-boot:run
 ```
 
-The startup order matters for manual testing because cart-service calls catalog-service, order-service calls cart-service, and inventory/order communicate through Kafka.
+The startup order matters for manual testing because cart-service calls catalog-service, order-service calls cart-service, and inventory/order/payment communicate through Kafka.
 
 ## Health Checks
 
@@ -102,6 +111,7 @@ curl http://localhost:8081/actuator/health
 curl http://localhost:8082/actuator/health
 curl http://localhost:8083/actuator/health
 curl http://localhost:8084/actuator/health
+curl http://localhost:8085/actuator/health
 ```
 
 Expected result: each service returns `UP`.
@@ -114,6 +124,7 @@ Expected result: each service returns `UP`.
 | cart-service | `http://localhost:8082/swagger-ui.html` |
 | order-service | `http://localhost:8083/swagger-ui.html` |
 | inventory-service | `http://localhost:8084/swagger-ui.html` |
+| payment-service | `http://localhost:8085/swagger-ui.html` |
 
 ## Happy Path API Sequence
 
@@ -335,6 +346,7 @@ Expected happy-path result:
 - Reservation exists.
 - Status is `RESERVED`.
 - Items match the order item quantities.
+- `totalAmount` and `currency` match the order amount. payment-service uses these fields.
 
 Verify inventory item quantities:
 
@@ -347,7 +359,7 @@ Expected result:
 - `reservedQuantity` increased by ordered quantity.
 - `availableQuantity` decreased by ordered quantity.
 
-### Step 7: Verify Order Status Update
+### Step 7: Verify Inventory Order Status Update
 
 Call order-service again:
 
@@ -357,12 +369,55 @@ curl http://localhost:8083/api/v1/orders/<order-id>
 
 Expected happy-path result:
 
-- `status` becomes `INVENTORY_RESERVED`.
+- `status` becomes `INVENTORY_RESERVED` before payment result processing completes, or it may already be `PAYMENT_COMPLETED` if payment-service and order-service processed the later payment event quickly.
 - `statusReason` is null.
 
 If the status is still `CREATED`, inventory-service may still be processing, Kafka may not be running, or order-service may not have consumed the inventory result event yet.
 
-### Step 8: Verify Cart Cleanup
+### Step 8: Verify Payment Attempt
+
+payment-service consumes `InventoryReservedEvent` asynchronously. Wait a few seconds, then call payment-service:
+
+```bash
+curl http://localhost:8085/api/v1/payments/orders/<order-id>
+```
+
+Expected happy-path result:
+
+- Payment attempt exists.
+- `status` is `COMPLETED`.
+- `amount` and `currency` match the order.
+- `providerTransactionId` starts with `MockPay-`.
+
+Verify through MongoDB:
+
+```javascript
+use eventcart_payment
+db.payment_attempts.find({ orderId: "<order-id>" }).pretty()
+```
+
+Payment simulation rule:
+
+```text
+Amounts below 50000.00 complete. Amounts at or above 50000.00 fail.
+```
+
+### Step 9: Verify Final Order Status
+
+Call order-service again:
+
+```bash
+curl http://localhost:8083/api/v1/orders/<order-id>
+```
+
+Expected happy-path result:
+
+- `status` becomes `PAYMENT_COMPLETED`.
+- `statusReason` is null.
+
+If the status is still `INVENTORY_RESERVED`, payment-service may still be processing, Kafka may not be running, or order-service may not have consumed the payment result event yet.
+
+### Step 10: Verify Cart Cleanup
 
 After inventory is successfully reserved, order-service clears the customer cart:
 
@@ -390,6 +445,8 @@ Expected topics include:
 eventcart.orders.created
 eventcart.inventory.reserved
 eventcart.inventory.failed
+eventcart.payments.completed
+eventcart.payments.failed
 ```
 
 Read order-created messages:
@@ -408,6 +465,18 @@ Read inventory-failed messages:
 
 ```powershell
 docker exec -it eventcart-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic eventcart.inventory.failed --from-beginning --max-messages 5
+```
+
+Read payment-completed messages:
+
+```powershell
+docker exec -it eventcart-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic eventcart.payments.completed --from-beginning --max-messages 5
+```
+
+Read payment-failed messages:
+
+```powershell
+docker exec -it eventcart-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic eventcart.payments.failed --from-beginning --max-messages 5
 ```
 
 ## Negative Flow: Empty Cart
@@ -474,6 +543,50 @@ curl http://localhost:8083/api/v1/orders/<order-id>
 curl http://localhost:8082/api/v1/carts/customer-1
 ```
 
+## Negative Flow: Payment Failure
+
+Use this to verify payment decline behavior.
+
+1. Create or update a product so the order total is at least `50000.00`.
+2. Seed enough inventory for the product.
+3. Add the product to cart.
+4. Place the order with a fresh idempotency key.
+
+Example high-value product:
+
+```bash
+curl -X POST \
+  http://localhost:8081/api/v1/products \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sku": "SKU-9001",
+    "name": "Premium Workstation",
+    "description": "High-value workstation used to test payment failure",
+    "category": "Electronics",
+    "price": 60000.00,
+    "currency": "INR",
+    "availableQuantity": 5,
+    "tags": ["workstation", "premium"]
+  }'
+```
+
+Expected result after placing an order:
+
+- inventory-service reserves stock.
+- payment-service creates a payment attempt with status `FAILED`.
+- payment-service publishes `PaymentFailedEvent`.
+- order-service updates order status to `PAYMENT_FAILED`.
+- order response contains `statusReason`.
+- cart is still cleared because inventory was successfully reserved before payment failed.
+
+Verify:
+
+```bash
+curl http://localhost:8085/api/v1/payments/orders/<order-id>
+curl http://localhost:8083/api/v1/orders/<order-id>
+curl http://localhost:8082/api/v1/carts/customer-1
+```
+
 ## Negative Flow: Duplicate Order Retry
 
 Use the same `idempotencyKey` after a successful order:
@@ -536,6 +649,8 @@ Expected result: cart-service rejects the request because inactive or missing pr
 | inventory-service | Failed reservation | `Reservation stock check failed`, `Inventory reservation failed` |
 | order-service | Inventory success | `Consumed InventoryReserved event`, `Order status updated after inventory reservation`, `Cart clear completed` |
 | order-service | Inventory failure | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
+| payment-service | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
+| order-service | Payment result | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
 
 To increase detail temporarily, set this in a service `application.yml`:
 
@@ -558,7 +673,10 @@ logging:
 | Redis key created | Idempotency key value is `ORDER:<order-id>` |
 | Kafka order event published | Message appears on `eventcart.orders.created` |
 | Inventory reserved | Reservation status is `RESERVED` |
-| Order status updated | Order status becomes `INVENTORY_RESERVED` |
+| Inventory order status updated | Order status becomes `INVENTORY_RESERVED` |
+| Payment attempt created | Payment exists in `eventcart_payment.payment_attempts` |
+| Payment event published | Message appears on `eventcart.payments.completed` or `eventcart.payments.failed` |
+| Final order status updated | Order status becomes `PAYMENT_COMPLETED` or `PAYMENT_FAILED` |
 | Cart cleared | Customer cart is empty after successful reservation |
 
 ## Troubleshooting Guide
@@ -569,6 +687,9 @@ logging:
 | Cart add fails | Product ID is wrong, inactive, or catalog-service is down | Check product API and cart-service logs |
 | Order stays `CREATED` | Kafka, inventory-service, or order-service consumer is not processing | Check Kafka topics and service logs |
 | Order becomes `INVENTORY_FAILED` | Stock is missing or insufficient | Check inventory quantity and reservation reason |
+| Payment attempt not found | payment-service is not running or did not consume `InventoryReservedEvent` | Check payment-service health and Kafka topic `eventcart.inventory.reserved` |
+| Order stays `INVENTORY_RESERVED` | payment-service or order-service payment consumer has not processed payment result | Check payment-service logs and payment topics |
+| Order becomes `PAYMENT_FAILED` | Mock payment amount is at or above `50000.00` | Check payment attempt failure reason |
 | Cart not cleared after success | cart-service was unavailable during cleanup | Check order-service warning logs and cart-service health |
 | Duplicate order confusion | Reused idempotency key | Use a fresh key or inspect Redis value |
 | Cannot connect to MongoDB | Docker container not running or wrong credentials | Run `docker compose ps` and check `compose.yaml` |
@@ -584,6 +705,8 @@ New joiners should be able to explain:
 - What eventual consistency means in this order flow.
 - Why Redis idempotency is useful for order placement.
 - Why cart cleanup happens after inventory is reserved, not immediately after order creation.
+- Why payment-service consumes `InventoryReservedEvent` instead of `OrderCreatedEvent`.
+- How payment-service handles duplicate Kafka messages.
 - Why the outbox pattern will be useful later.
 
 ## Maintenance Rule
@@ -602,4 +725,3 @@ After updating this Markdown file, regenerate the Word document:
 ```powershell
 & "C:\Users\HP\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" docs/tools/generate_qa_flow_docx.py docs/10-qa-application-flow.md docs/EventCart-QA-Application-Flow.docx
 ```
-

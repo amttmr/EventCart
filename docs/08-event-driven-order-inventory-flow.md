@@ -1,6 +1,6 @@
-# Event-Driven Order And Inventory Flow
+# Event-Driven Order, Inventory, And Payment Flow
 
-This document explains the first Kafka-based business flow in EventCart.
+This document explains the Kafka-based business flow in EventCart.
 
 ## Flow
 
@@ -14,14 +14,19 @@ This document explains the first Kafka-based business flow in EventCart.
 8. inventory-service publishes either `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
 9. order-service consumes the inventory result event.
 10. order-service updates the order status and clears the cart only after successful inventory reservation.
+11. payment-service consumes `InventoryReservedEvent`.
+12. payment-service stores a payment attempt and publishes `PaymentCompletedEvent` or `PaymentFailedEvent`.
+13. order-service consumes the payment result event and updates final payment status.
 
 ## Topics
 
 | Topic | Producer | Consumer | Purpose |
 | --- | --- | --- | --- |
 | `eventcart.orders.created` | order-service | inventory-service | Tells downstream services an order was placed |
-| `eventcart.inventory.reserved` | inventory-service | order-service, future payment-service | Tells the system stock was reserved |
+| `eventcart.inventory.reserved` | inventory-service | order-service, payment-service | Tells the system stock was reserved |
 | `eventcart.inventory.failed` | inventory-service | order-service, future notification-service | Tells the system stock could not be reserved |
+| `eventcart.payments.completed` | payment-service | order-service, future notification-service | Tells the system payment completed |
+| `eventcart.payments.failed` | payment-service | order-service, future notification-service | Tells the system payment failed |
 
 ## MongoDB Collections
 
@@ -30,6 +35,7 @@ This document explains the first Kafka-based business flow in EventCart.
 | order-service | `eventcart_order` | `orders` | Stores order snapshots |
 | inventory-service | `eventcart_inventory` | `inventory_items` | Stores product stock |
 | inventory-service | `eventcart_inventory` | `inventory_reservations` | Stores reservation results |
+| payment-service | `eventcart_payment` | `payment_attempts` | Stores mock payment attempts |
 
 ## Redis Keys
 
@@ -54,6 +60,18 @@ The order status is the user-facing view of that eventual consistency:
 | `CREATED` | Order is saved and waiting for inventory result |
 | `INVENTORY_RESERVED` | Stock was reserved and the customer's cart cleanup was triggered |
 | `INVENTORY_FAILED` | Stock could not be reserved; `statusReason` explains why |
+| `PAYMENT_COMPLETED` | Mock payment completed successfully |
+| `PAYMENT_FAILED` | Mock payment failed; `statusReason` explains why |
+
+## Payment Simulation
+
+payment-service uses a deterministic mock provider rule:
+
+```text
+Amounts below 50000.00 complete. Amounts at or above 50000.00 fail.
+```
+
+The service consumes only successful inventory reservations, so payment does not run if stock could not be reserved.
 
 ## Current Limitations
 
@@ -61,6 +79,7 @@ This first implementation intentionally keeps the event flow simple:
 
 - order-service saves to MongoDB and then publishes to Kafka directly.
 - inventory-service updates stock and saves the reservation directly.
+- payment-service saves the payment attempt and then publishes to Kafka directly.
 - There is no retry topic, dead-letter topic, distributed tracing, or outbox pattern yet.
 - Kafka producer and consumer infrastructure is configured explicitly in the services so the project does not depend on hidden auto-configuration.
 - Cart cleanup after inventory reservation is best-effort. If cart-service is unavailable, the order status remains reserved and the warning log shows the cleanup failure.
@@ -75,3 +94,4 @@ These are useful next interview topics because they show how a basic working eve
 - Event payloads should contain useful snapshots so consumers do not need extra synchronous calls.
 - The outbox pattern helps avoid the "database save succeeded but Kafka publish failed" problem.
 - Redis idempotency protects order placement from duplicate client retries.
+- payment-service is an example of event chaining: one event-driven service produces the next business fact.

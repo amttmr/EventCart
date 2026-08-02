@@ -35,12 +35,19 @@ Implemented so far:
   - Publish `OrderCreatedEvent` to Kafka.
   - Consume inventory reservation result events.
   - Update order status to `INVENTORY_RESERVED` or `INVENTORY_FAILED`.
+  - Consume payment result events.
+  - Update order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`.
   - Clear the cart after successful inventory reservation.
 - `inventory-service`
   - Seed product stock for local testing.
   - Consume `OrderCreatedEvent` from Kafka.
   - Reserve stock when available.
   - Publish `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
+- `payment-service`
+  - Consume `InventoryReservedEvent` from Kafka.
+  - Simulate payment success or failure.
+  - Store payment attempts in MongoDB.
+  - Publish `PaymentCompletedEvent` or `PaymentFailedEvent`.
 - Docker Compose:
   - MongoDB
   - Kafka
@@ -124,6 +131,12 @@ Build only the inventory service and required modules:
 
 ```powershell
 mvn -pl services/inventory-service -am clean verify
+```
+
+Build only the payment service and required modules:
+
+```powershell
+mvn -pl services/payment-service -am clean verify
 ```
 
 ## Run Catalog Service
@@ -236,6 +249,33 @@ Swagger/OpenAPI documentation:
 ```text
 http://localhost:8084/swagger-ui.html
 http://localhost:8084/v3/api-docs
+```
+
+## Run Payment Service
+
+Start Kafka through Docker Compose before starting payment-service. Start payment-service before placing an order if you want to watch payment events get consumed immediately.
+
+```powershell
+mvn -pl services/payment-service spring-boot:run
+```
+
+The service runs on:
+
+```text
+http://localhost:8085
+```
+
+Health endpoint:
+
+```text
+http://localhost:8085/actuator/health
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8085/swagger-ui.html
+http://localhost:8085/v3/api-docs
 ```
 
 ## Product API Examples
@@ -392,7 +432,7 @@ Invoke-RestMethod -Method Post `
   -Body $body
 ```
 
-When order-service places the order, it stores an idempotency key in Redis and publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result.
+When order-service places the order, it stores an idempotency key in Redis and publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result. payment-service consumes successful inventory reservations and creates a payment attempt.
 
 Check order status by order ID:
 
@@ -406,7 +446,19 @@ Check reservation result by order ID:
 Invoke-RestMethod "http://localhost:8084/api/v1/inventory/reservations/<order-id>"
 ```
 
-After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
+Check payment attempt by order ID:
+
+```powershell
+Invoke-RestMethod "http://localhost:8085/api/v1/payments/orders/<order-id>"
+```
+
+After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. payment-service then publishes `PaymentCompletedEvent` or `PaymentFailedEvent`, and order-service updates the order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
+
+Payment simulation rule:
+
+```text
+Amounts below 50000.00 complete. Amounts at or above 50000.00 fail.
+```
 
 ## What This Teaches
 
@@ -431,6 +483,7 @@ This first slice covers:
 - Kafka producer basics with `OrderCreatedEvent`.
 - Kafka consumer basics with inventory reservation.
 - Kafka consumer basics with order status updates from inventory result events.
+- Kafka event chaining with payment simulation after inventory reservation.
 - Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
@@ -467,3 +520,5 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 15. What is the outbox pattern, and why will we need it later?
 16. How does Redis-based idempotency protect order creation from duplicate client retries?
 17. Why do we clear the cart after inventory reservation instead of immediately after order creation?
+18. Why does payment-service consume `InventoryReservedEvent` instead of `OrderCreatedEvent`?
+19. How does payment-service handle duplicate Kafka messages?

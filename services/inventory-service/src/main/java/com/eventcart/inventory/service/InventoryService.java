@@ -131,6 +131,8 @@ public class InventoryService {
         reservation.setCustomerId(event.customerId());
         reservation.setStatus(InventoryReservationStatus.RESERVED);
         reservation.setItems(reservedItems);
+        reservation.setTotalAmount(event.totalAmount());
+        reservation.setCurrency(event.currency());
 
         InventoryReservationDocument savedReservation = reservationRepository.save(reservation);
         log.info("Inventory reserved orderId={} reservationId={} itemCount={}",
@@ -215,6 +217,8 @@ public class InventoryService {
         reservation.setOrderId(event.orderId());
         reservation.setCustomerId(event.customerId());
         reservation.setStatus(InventoryReservationStatus.FAILED);
+        reservation.setTotalAmount(event.totalAmount());
+        reservation.setCurrency(event.currency());
         reservation.setFailureReason(reason);
         return reservationRepository.save(reservation);
     }

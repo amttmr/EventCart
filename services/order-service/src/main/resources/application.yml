@@ -66,3 +66,5 @@ eventcart:
       order-created: eventcart.orders.created
       inventory-reserved: eventcart.inventory.reserved
       inventory-failed: eventcart.inventory.failed
+      payment-completed: eventcart.payments.completed
+      payment-failed: eventcart.payments.failed
