@@ -4,9 +4,10 @@ server:
 spring:
   application:
     name: catalog-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_catalog?authSource=admin
   data:
     mongodb:
-      uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_catalog?authSource=admin
       auto-index-creation: true
   kafka:
     bootstrap-servers: localhost:9092
@@ -43,4 +44,3 @@ info:
 logging:
   level:
     com.eventcart: INFO
-

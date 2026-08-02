@@ -30,6 +30,7 @@ Start here:
 3. [Application Scope](docs/02-application-scope.md)
 4. [Learning and Interview Roadmap](docs/03-learning-and-interview-roadmap.md)
 5. [Documentation Standards](docs/04-documentation-standards.md)
+6. [Local Development](docs/05-local-development.md)
 
 ## Planned Services
 
@@ -69,4 +70,3 @@ By the end of this project, you should be able to:
 - Test services using Testcontainers.
 - Run the full stack locally with Docker Compose.
 - Discuss the project confidently in Java backend and microservices interviews.
-

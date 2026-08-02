@@ -1,7 +1,8 @@
 spring:
+  mongodb:
+    uri: mongodb://localhost:27017/eventcart_catalog_test
   data:
     mongodb:
-      uri: mongodb://localhost:27017/eventcart_catalog_test
+      auto-index-creation: true
   kafka:
     bootstrap-servers: localhost:9092
-
