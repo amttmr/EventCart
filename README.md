@@ -62,7 +62,8 @@ EventCart will be developed as a Maven multi-module project:
 6. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
 7. Payment Service consumes `InventoryReserved`, simulates payment, and publishes `PaymentCompleted` or `PaymentFailed`.
 8. Order Service consumes payment result events and updates final payment/order status.
-9. Notification Service sends customer updates asynchronously.
+9. Inventory Service consumes failed payment events and releases reserved stock.
+10. Notification Service sends customer updates asynchronously.
 
 ## Learning Promise
 

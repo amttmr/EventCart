@@ -3,8 +3,10 @@ package com.eventcart.inventory.service;
 import com.eventcart.common.events.EventMetadata;
 import com.eventcart.common.events.OrderCreatedEvent;
 import com.eventcart.common.events.OrderCreatedItem;
+import com.eventcart.common.events.PaymentFailedEvent;
 import com.eventcart.inventory.domain.InventoryItemDocument;
 import com.eventcart.inventory.domain.InventoryReservationDocument;
+import com.eventcart.inventory.domain.InventoryReservationItemDocument;
 import com.eventcart.inventory.domain.InventoryReservationStatus;
 import com.eventcart.inventory.dto.InventoryReservationResponse;
 import com.eventcart.inventory.event.InventoryEventPublisher;
@@ -92,6 +94,49 @@ class InventoryServiceTest {
     }
 
     /**
+     * Verifies that reserved stock is released when payment fails.
+     */
+    @Test
+    void releaseReservationAfterPaymentFailureShouldReleaseStock() {
+        InventoryItemDocument stock = stock(3);
+        stock.setReservedQuantity(2);
+        InventoryReservationDocument reservation = reservedReservation();
+        when(reservationRepository.findByOrderId("order-1")).thenReturn(Optional.of(reservation));
+        when(inventoryItemRepository.findById("product-1")).thenReturn(Optional.of(stock));
+        when(inventoryItemRepository.save(stock)).thenReturn(stock);
+        when(reservationRepository.save(reservation)).thenReturn(reservation);
+
+        Optional<InventoryReservationResponse> response =
+                inventoryService.releaseReservationAfterPaymentFailure(paymentFailedEvent());
+
+        assertThat(response).isPresent();
+        assertThat(response.get().status()).isEqualTo(InventoryReservationStatus.RELEASED);
+        assertThat(response.get().failureReason()).contains("Released after payment failure");
+        assertThat(stock.getAvailableQuantity()).isEqualTo(5);
+        assertThat(stock.getReservedQuantity()).isZero();
+        verify(inventoryItemRepository).save(stock);
+        verify(reservationRepository).save(reservation);
+    }
+
+    /**
+     * Verifies that duplicate payment-failed events do not release stock twice.
+     */
+    @Test
+    void releaseReservationAfterPaymentFailureShouldSkipAlreadyReleasedReservation() {
+        InventoryReservationDocument reservation = reservedReservation();
+        reservation.setStatus(InventoryReservationStatus.RELEASED);
+        when(reservationRepository.findByOrderId("order-1")).thenReturn(Optional.of(reservation));
+
+        Optional<InventoryReservationResponse> response =
+                inventoryService.releaseReservationAfterPaymentFailure(paymentFailedEvent());
+
+        assertThat(response).isPresent();
+        assertThat(response.get().status()).isEqualTo(InventoryReservationStatus.RELEASED);
+        verify(inventoryItemRepository, never()).save(any());
+        verify(reservationRepository, never()).save(any());
+    }
+
+    /**
      * Creates an inventory stock document for service tests.
      *
      * @param availableQuantity available quantity
@@ -105,6 +150,40 @@ class InventoryServiceTest {
         stock.setAvailableQuantity(availableQuantity);
         stock.setReservedQuantity(0);
         return stock;
+    }
+
+    /**
+     * Creates a reserved inventory reservation document for service tests.
+     *
+     * @return reserved reservation document
+     */
+    private InventoryReservationDocument reservedReservation() {
+        InventoryReservationDocument reservation = new InventoryReservationDocument();
+        reservation.setId("reservation-1");
+        reservation.setOrderId("order-1");
+        reservation.setCustomerId("customer-1");
+        reservation.setStatus(InventoryReservationStatus.RESERVED);
+        reservation.setItems(List.of(new InventoryReservationItemDocument("product-1", "SKU-1", 2)));
+        reservation.setTotalAmount(new BigDecimal("13998.00"));
+        reservation.setCurrency("INR");
+        return reservation;
+    }
+
+    /**
+     * Creates a payment-failed event for compensation tests.
+     *
+     * @return payment-failed event
+     */
+    private PaymentFailedEvent paymentFailedEvent() {
+        return new PaymentFailedEvent(
+                EventMetadata.create(PaymentFailedEvent.EVENT_TYPE, PaymentFailedEvent.VERSION, "order-1"),
+                "payment-1",
+                "order-1",
+                "customer-1",
+                new BigDecimal("13998.00"),
+                "INR",
+                "Mock payment declined"
+        );
     }
 
     /**

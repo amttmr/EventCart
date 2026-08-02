@@ -2,6 +2,7 @@ package com.eventcart.inventory.service;
 
 import com.eventcart.common.events.OrderCreatedEvent;
 import com.eventcart.common.events.OrderCreatedItem;
+import com.eventcart.common.events.PaymentFailedEvent;
 import com.eventcart.inventory.domain.InventoryItemDocument;
 import com.eventcart.inventory.domain.InventoryReservationDocument;
 import com.eventcart.inventory.domain.InventoryReservationItemDocument;
@@ -142,6 +143,43 @@ public class InventoryService {
     }
 
     /**
+     * Releases previously reserved stock when payment fails for an order.
+     *
+     * @param event payment-failed event consumed from Kafka
+     * @return reservation response when a reservation exists for the order
+     */
+    public Optional<InventoryReservationResponse> releaseReservationAfterPaymentFailure(PaymentFailedEvent event) {
+        log.info("Releasing inventory after payment failure orderId={} paymentId={} reason={}",
+                event.orderId(), event.paymentId(), event.reason());
+        Optional<InventoryReservationDocument> reservationResult = reservationRepository.findByOrderId(event.orderId());
+        if (reservationResult.isEmpty()) {
+            log.warn("Cannot release inventory because reservation was not found orderId={} paymentId={}",
+                    event.orderId(), event.paymentId());
+            return Optional.empty();
+        }
+
+        InventoryReservationDocument reservation = reservationResult.get();
+        if (reservation.getStatus() == InventoryReservationStatus.RELEASED) {
+            log.info("Skipping duplicate inventory release orderId={} reservationId={}",
+                    event.orderId(), reservation.getId());
+            return Optional.of(inventoryMapper.toReservationResponse(reservation));
+        }
+        if (reservation.getStatus() == InventoryReservationStatus.FAILED) {
+            log.info("Skipping inventory release because reservation already failed orderId={} reservationId={}",
+                    event.orderId(), reservation.getId());
+            return Optional.of(inventoryMapper.toReservationResponse(reservation));
+        }
+
+        releaseItems(reservation.getItems());
+        reservation.setStatus(InventoryReservationStatus.RELEASED);
+        reservation.setFailureReason("Released after payment failure: " + event.reason());
+        InventoryReservationDocument savedReservation = reservationRepository.save(reservation);
+        log.info("Inventory released after payment failure orderId={} reservationId={} itemCount={}",
+                event.orderId(), savedReservation.getId(), savedReservation.getItems().size());
+        return Optional.of(inventoryMapper.toReservationResponse(savedReservation));
+    }
+
+    /**
      * Finds one inventory item or throws a not-found exception.
      *
      * @param productId product ID
@@ -203,6 +241,33 @@ public class InventoryService {
         }
 
         return reservedItems;
+    }
+
+    /**
+     * Releases reserved item quantities back into available stock.
+     *
+     * @param items reserved item quantities to release
+     */
+    private void releaseItems(List<InventoryReservationItemDocument> items) {
+        for (InventoryReservationItemDocument item : items) {
+            Optional<InventoryItemDocument> stockResult = inventoryItemRepository.findById(item.productId());
+            if (stockResult.isEmpty()) {
+                log.warn("Reserved stock document missing during release productId={} quantity={}",
+                        item.productId(), item.quantity());
+                continue;
+            }
+
+            InventoryItemDocument stock = stockResult.get();
+            if (stock.getReservedQuantity() < item.quantity()) {
+                log.warn("Reserved quantity lower than release quantity productId={} reservedQuantity={} releaseQuantity={}",
+                        item.productId(), stock.getReservedQuantity(), item.quantity());
+            }
+            stock.setAvailableQuantity(stock.getAvailableQuantity() + item.quantity());
+            stock.setReservedQuantity(Math.max(0, stock.getReservedQuantity() - item.quantity()));
+            inventoryItemRepository.save(stock);
+            log.debug("Released stock productId={} quantity={} availableQuantity={} reservedQuantity={}",
+                    item.productId(), item.quantity(), stock.getAvailableQuantity(), stock.getReservedQuantity());
+        }
     }
 
     /**

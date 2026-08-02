@@ -39,6 +39,7 @@ logging:
 | Order failure update | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
 | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
 | Final order payment update | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
+| Inventory compensation | `Consumed PaymentFailed event`, `Releasing inventory after payment failure`, `Inventory released after payment failure` |
 
 ## Debug Redis Idempotency
 

@@ -5,5 +5,6 @@ package com.eventcart.inventory.domain;
  */
 public enum InventoryReservationStatus {
     RESERVED,
-    FAILED
+    FAILED,
+    RELEASED
 }

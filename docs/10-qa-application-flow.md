@@ -67,6 +67,8 @@ flowchart TD
     S -->|No| U["payment-service publishes PaymentFailedEvent"]
     T --> V["order-service updates order to PAYMENT_COMPLETED"]
     U --> W["order-service updates order to PAYMENT_FAILED"]
+    U --> X["inventory-service releases reserved stock"]
+    X --> Y["inventory reservation becomes RELEASED"]
     N --> Q["order-service updates order to INVENTORY_FAILED"]
 ```
 
@@ -576,6 +578,9 @@ Expected result after placing an order:
 - payment-service creates a payment attempt with status `FAILED`.
 - payment-service publishes `PaymentFailedEvent`.
 - order-service updates order status to `PAYMENT_FAILED`.
+- inventory-service consumes `PaymentFailedEvent`.
+- inventory-service releases the reserved stock.
+- inventory reservation status becomes `RELEASED`.
 - order response contains `statusReason`.
 - cart is still cleared because inventory was successfully reserved before payment failed.
 
@@ -585,7 +590,17 @@ Verify:
 curl http://localhost:8085/api/v1/payments/orders/<order-id>
 curl http://localhost:8083/api/v1/orders/<order-id>
 curl http://localhost:8082/api/v1/carts/customer-1
+curl http://localhost:8084/api/v1/inventory/reservations/<order-id>
+curl http://localhost:8084/api/v1/inventory/<product-id>
 ```
+
+Expected compensation result:
+
+- Payment attempt status is `FAILED`.
+- Order status is `PAYMENT_FAILED`.
+- Reservation status is `RELEASED`.
+- Inventory `reservedQuantity` decreases by the order quantity.
+- Inventory `availableQuantity` increases by the order quantity.
 
 ## Negative Flow: Duplicate Order Retry
 
@@ -651,6 +666,7 @@ Expected result: cart-service rejects the request because inactive or missing pr
 | order-service | Inventory failure | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
 | payment-service | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
 | order-service | Payment result | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
+| inventory-service | Payment compensation | `Consumed PaymentFailed event`, `Releasing inventory after payment failure`, `Inventory released after payment failure` |
 
 To increase detail temporarily, set this in a service `application.yml`:
 
@@ -678,6 +694,7 @@ logging:
 | Payment event published | Message appears on `eventcart.payments.completed` or `eventcart.payments.failed` |
 | Final order status updated | Order status becomes `PAYMENT_COMPLETED` or `PAYMENT_FAILED` |
 | Cart cleared | Customer cart is empty after successful reservation |
+| Failed payment compensation | Reservation becomes `RELEASED` and stock is returned |
 
 ## Troubleshooting Guide
 
@@ -690,6 +707,7 @@ logging:
 | Payment attempt not found | payment-service is not running or did not consume `InventoryReservedEvent` | Check payment-service health and Kafka topic `eventcart.inventory.reserved` |
 | Order stays `INVENTORY_RESERVED` | payment-service or order-service payment consumer has not processed payment result | Check payment-service logs and payment topics |
 | Order becomes `PAYMENT_FAILED` | Mock payment amount is at or above `50000.00` | Check payment attempt failure reason |
+| Reservation stays `RESERVED` after payment failure | inventory-service did not consume `PaymentFailedEvent` | Check inventory-service logs and Kafka topic `eventcart.payments.failed` |
 | Cart not cleared after success | cart-service was unavailable during cleanup | Check order-service warning logs and cart-service health |
 | Duplicate order confusion | Reused idempotency key | Use a fresh key or inspect Redis value |
 | Cannot connect to MongoDB | Docker container not running or wrong credentials | Run `docker compose ps` and check `compose.yaml` |
@@ -707,6 +725,7 @@ New joiners should be able to explain:
 - Why cart cleanup happens after inventory is reserved, not immediately after order creation.
 - Why payment-service consumes `InventoryReservedEvent` instead of `OrderCreatedEvent`.
 - How payment-service handles duplicate Kafka messages.
+- Why inventory-service performs a compensating release after payment failure.
 - Why the outbox pattern will be useful later.
 
 ## Maintenance Rule

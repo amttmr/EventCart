@@ -88,7 +88,7 @@ This document defines what EventCart will do, who uses it, and how the main work
 | `eventcart.inventory.reserved` | Inventory Service | Order Service, Payment Service |
 | `eventcart.inventory.failed` | Inventory Service | Order Service, future Notification Service |
 | `eventcart.payments.completed` | Payment Service | Order Service, future Notification Service |
-| `eventcart.payments.failed` | Payment Service | Order Service, future Notification Service |
+| `eventcart.payments.failed` | Payment Service | Order Service, Inventory Service, future Notification Service |
 | `notification.events` | Multiple services | Notification Service |
 | `dead-letter.events` | Error handlers | Developers/Admin diagnostics |
 

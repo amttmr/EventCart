@@ -42,6 +42,8 @@ Implemented so far:
   - Seed product stock for local testing.
   - Consume `OrderCreatedEvent` from Kafka.
   - Reserve stock when available.
+  - Consume `PaymentFailedEvent` from Kafka.
+  - Release reserved stock when payment fails.
   - Publish `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
 - `payment-service`
   - Consume `InventoryReservedEvent` from Kafka.
@@ -452,7 +454,7 @@ Check payment attempt by order ID:
 Invoke-RestMethod "http://localhost:8085/api/v1/payments/orders/<order-id>"
 ```
 
-After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. payment-service then publishes `PaymentCompletedEvent` or `PaymentFailedEvent`, and order-service updates the order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
+After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. payment-service then publishes `PaymentCompletedEvent` or `PaymentFailedEvent`, and order-service updates the order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`. If payment fails, inventory-service consumes `PaymentFailedEvent`, releases the reserved stock, and changes the reservation status to `RELEASED`. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
 
 Payment simulation rule:
 
@@ -484,6 +486,7 @@ This first slice covers:
 - Kafka consumer basics with inventory reservation.
 - Kafka consumer basics with order status updates from inventory result events.
 - Kafka event chaining with payment simulation after inventory reservation.
+- Compensating actions by releasing reserved inventory after payment failure.
 - Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
@@ -522,3 +525,4 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 17. Why do we clear the cart after inventory reservation instead of immediately after order creation?
 18. Why does payment-service consume `InventoryReservedEvent` instead of `OrderCreatedEvent`?
 19. How does payment-service handle duplicate Kafka messages?
+20. Why does inventory-service need to release stock when payment fails?

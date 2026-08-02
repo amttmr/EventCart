@@ -92,6 +92,8 @@ Seed inventory request:
 }
 ```
 
+Reservation statuses currently include `RESERVED`, `FAILED`, and `RELEASED`. `RELEASED` means stock was originally reserved but later returned to available stock after payment failed.
+
 ## Payment APIs
 
 | Method | Path | Purpose |
