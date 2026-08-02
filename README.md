@@ -35,6 +35,7 @@ Start here:
 8. [Service-to-Service Communication](docs/07-service-to-service-communication.md)
 9. [Event-Driven Order and Inventory Flow](docs/08-event-driven-order-inventory-flow.md)
 10. [Logging and Debugging](docs/09-logging-and-debugging.md)
+11. [QA and New Joiner Application Flow Guide](docs/10-qa-application-flow.md)
 
 ## Planned Services
 

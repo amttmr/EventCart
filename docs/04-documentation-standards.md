@@ -11,6 +11,7 @@ Every major feature will be documented as we build it. The documentation should 
 | Architecture docs | `docs/architecture/` | System design, diagrams, service boundaries |
 | Decision records | `docs/decisions/` | Why we chose a technology or design |
 | Interview notes | `docs/interview/` | Questions, answers, explanations, resume points |
+| QA handoff guide | `docs/10-qa-application-flow.md` and `docs/EventCart-QA-Application-Flow.docx` | End-to-end API sequence and verification guide for QA and new joiners |
 | Troubleshooting | `docs/troubleshooting.md` | Common errors and fixes |
 
 ## Feature Documentation Template
@@ -101,3 +102,18 @@ For each completed milestone, we will add:
 - Mistakes to avoid.
 - How this project demonstrates the concept.
 
+## QA Handoff Documentation Rule
+
+Whenever we add or change application functionality, update the QA handoff guide if the change affects:
+
+- API sequence, request payload, response payload, or status code.
+- MongoDB database, collection, or verification query.
+- Kafka topic, event payload, producer, or consumer.
+- Redis key format or idempotency behavior.
+- Service startup order, port, local dependency, or troubleshooting steps.
+
+After updating `docs/10-qa-application-flow.md`, regenerate `docs/EventCart-QA-Application-Flow.docx` using:
+
+```powershell
+& "C:\Users\HP\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe" docs/tools/generate_qa_flow_docx.py docs/10-qa-application-flow.md docs/EventCart-QA-Application-Flow.docx
+```
