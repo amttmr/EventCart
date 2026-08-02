@@ -28,6 +28,7 @@ EventCart/
     06-api-documentation.md
     07-service-to-service-communication.md
     08-event-driven-order-inventory-flow.md
+    09-logging-and-debugging.md
     api/
     architecture/
     decisions/

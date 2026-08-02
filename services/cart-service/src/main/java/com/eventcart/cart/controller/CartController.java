@@ -7,6 +7,8 @@ import com.eventcart.cart.service.CartService;
 import com.eventcart.common.web.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -47,7 +49,7 @@ public class CartController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cart returned")
     @GetMapping("/{customerId}")
     public ApiResponse<CartResponse> getCart(
-            @Parameter(description = "Customer ID") @PathVariable String customerId
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {
         return ApiResponse.success(cartService.getCart(customerId));
     }
@@ -68,7 +70,36 @@ public class CartController {
     })
     @PostMapping("/{customerId}/items")
     public ApiResponse<CartResponse> addItem(
-            @Parameter(description = "Customer ID") @PathVariable String customerId,
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Product and quantity to add. cart-service fetches name, SKU, price, and currency from catalog-service.",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Add one product",
+                                            summary = "Add two units of a catalog product",
+                                            value = """
+                                                    {
+                                                      "productId": "6a6f2ff6c33ef72269887fec",
+                                                      "quantity": 2
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Add a single unit",
+                                            summary = "Minimum valid quantity",
+                                            value = """
+                                                    {
+                                                      "productId": "6a6f2ff6c33ef72269887fec",
+                                                      "quantity": 1
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
             @Valid @RequestBody AddCartItemRequest request
     ) {
         return ApiResponse.success(cartService.addItem(customerId, request), "Item added to cart");
@@ -90,8 +121,33 @@ public class CartController {
     })
     @PutMapping("/{customerId}/items/{productId}")
     public ApiResponse<CartResponse> updateItemQuantity(
-            @Parameter(description = "Customer ID") @PathVariable String customerId,
-            @Parameter(description = "Product ID") @PathVariable String productId,
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
+            @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Replacement quantity for the existing cart item",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Increase quantity",
+                                            value = """
+                                                    {
+                                                      "quantity": 3
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Set to one",
+                                            value = """
+                                                    {
+                                                      "quantity": 1
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
             @Valid @RequestBody UpdateCartItemQuantityRequest request
     ) {
         return ApiResponse.success(
@@ -114,8 +170,8 @@ public class CartController {
     })
     @DeleteMapping("/{customerId}/items/{productId}")
     public ApiResponse<CartResponse> removeItem(
-            @Parameter(description = "Customer ID") @PathVariable String customerId,
-            @Parameter(description = "Product ID") @PathVariable String productId
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
+            @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId
     ) {
         return ApiResponse.success(cartService.removeItem(customerId, productId), "Cart item removed");
     }
@@ -130,7 +186,7 @@ public class CartController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Cart cleared")
     @DeleteMapping("/{customerId}")
     public ResponseEntity<Void> clearCart(
-            @Parameter(description = "Customer ID") @PathVariable String customerId
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {
         cartService.clearCart(customerId);
         return ResponseEntity.noContent().build();

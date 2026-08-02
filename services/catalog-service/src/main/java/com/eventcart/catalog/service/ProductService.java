@@ -9,6 +9,8 @@ import com.eventcart.catalog.exception.DuplicateResourceException;
 import com.eventcart.catalog.exception.ResourceNotFoundException;
 import com.eventcart.catalog.mapper.ProductMapper;
 import com.eventcart.catalog.repository.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +34,8 @@ import java.util.regex.Pattern;
  */
 @Service
 public class ProductService {
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
+
     private final ProductRepository productRepository;
     private final MongoTemplate mongoTemplate;
     private final ProductMapper productMapper;
@@ -60,11 +64,17 @@ public class ProductService {
      * @return created product response
      */
     public ProductResponse createProduct(CreateProductRequest request) {
+        log.info("Creating product sku={} category={} currency={} availableQuantity={}",
+                request.sku(), request.category(), request.currency(), request.availableQuantity());
+
         if (productRepository.existsBySku(request.sku())) {
+            log.warn("Product creation rejected because SKU already exists sku={}", request.sku());
             throw new DuplicateResourceException("Product SKU already exists: " + request.sku());
         }
 
         ProductDocument savedProduct = productRepository.save(productMapper.toDocument(request));
+        log.info("Product created productId={} sku={} active={}",
+                savedProduct.getId(), savedProduct.getSku(), savedProduct.isActive());
         return productMapper.toResponse(savedProduct);
     }
 
@@ -75,6 +85,7 @@ public class ProductService {
      * @return product response
      */
     public ProductResponse getProduct(String productId) {
+        log.debug("Fetching product productId={}", productId);
         return productMapper.toResponse(findProduct(productId));
     }
 
@@ -86,6 +97,15 @@ public class ProductService {
      * @return page of matching products
      */
     public Page<ProductResponse> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
+        log.debug("Searching products keyword={} category={} active={} minPrice={} maxPrice={} page={} size={}",
+                criteria.keyword(),
+                criteria.category(),
+                criteria.active(),
+                criteria.minPrice(),
+                criteria.maxPrice(),
+                pageable.getPageNumber(),
+                pageable.getPageSize());
+
         Query query = buildSearchQuery(criteria).with(pageable);
         Query countQuery = buildSearchQuery(criteria);
 
@@ -95,6 +115,7 @@ public class ProductService {
                 .map(productMapper::toResponse)
                 .toList();
 
+        log.debug("Product search completed total={} returned={}", total, products.size());
         return new PageImpl<>(products, pageable, total);
     }
 
@@ -106,9 +127,13 @@ public class ProductService {
      * @return updated product response
      */
     public ProductResponse updateProduct(String productId, UpdateProductRequest request) {
+        log.info("Updating product productId={} category={} active={}", productId, request.category(), request.active());
         ProductDocument product = findProduct(productId);
         productMapper.updateDocument(product, request);
-        return productMapper.toResponse(productRepository.save(product));
+        ProductDocument savedProduct = productRepository.save(product);
+        log.info("Product updated productId={} sku={} version={}",
+                savedProduct.getId(), savedProduct.getSku(), savedProduct.getVersion());
+        return productMapper.toResponse(savedProduct);
     }
 
     /**
@@ -120,9 +145,11 @@ public class ProductService {
      * @param productId MongoDB product ID
      */
     public void deactivateProduct(String productId) {
+        log.info("Deactivating product productId={}", productId);
         ProductDocument product = findProduct(productId);
         product.setActive(false);
-        productRepository.save(product);
+        ProductDocument savedProduct = productRepository.save(product);
+        log.info("Product deactivated productId={} sku={}", savedProduct.getId(), savedProduct.getSku());
     }
 
     /**
@@ -132,8 +159,12 @@ public class ProductService {
      * @return product document
      */
     private ProductDocument findProduct(String productId) {
+        log.debug("Loading product document productId={}", productId);
         return productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+                .orElseThrow(() -> {
+                    log.warn("Product not found productId={}", productId);
+                    return new ResourceNotFoundException("Product not found: " + productId);
+                });
     }
 
     /**

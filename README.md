@@ -34,6 +34,7 @@ Start here:
 7. [API Documentation](docs/06-api-documentation.md)
 8. [Service-to-Service Communication](docs/07-service-to-service-communication.md)
 9. [Event-Driven Order and Inventory Flow](docs/08-event-driven-order-inventory-flow.md)
+10. [Logging and Debugging](docs/09-logging-and-debugging.md)
 
 ## Planned Services
 

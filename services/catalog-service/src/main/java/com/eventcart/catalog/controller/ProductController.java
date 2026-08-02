@@ -9,6 +9,8 @@ import com.eventcart.common.web.ApiResponse;
 import com.eventcart.common.web.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -63,6 +65,47 @@ public class ProductController {
     })
     @PostMapping
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Product details to create in catalog-service",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Electronics product",
+                                            summary = "Mechanical keyboard",
+                                            value = """
+                                                    {
+                                                      "sku": "SKU-1001",
+                                                      "name": "Mechanical Keyboard",
+                                                      "description": "Hot-swappable mechanical keyboard with RGB lighting",
+                                                      "category": "Electronics",
+                                                      "price": 6999.00,
+                                                      "currency": "INR",
+                                                      "availableQuantity": 25,
+                                                      "tags": ["keyboard", "gaming", "rgb"]
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Book product",
+                                            summary = "Interview preparation book",
+                                            value = """
+                                                    {
+                                                      "sku": "BOOK-2001",
+                                                      "name": "Java Microservices Interview Guide",
+                                                      "description": "Backend interview preparation book for Java and Spring Boot",
+                                                      "category": "Books",
+                                                      "price": 1499.00,
+                                                      "currency": "INR",
+                                                      "availableQuantity": 100,
+                                                      "tags": ["java", "spring", "interview"]
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
             @Valid @RequestBody CreateProductRequest request
     ) {
         ProductResponse product = productService.createProduct(request);
@@ -84,7 +127,7 @@ public class ProductController {
     })
     @GetMapping("/{productId}")
     public ApiResponse<ProductResponse> getProduct(
-            @Parameter(description = "MongoDB product ID") @PathVariable String productId
+            @Parameter(description = "MongoDB product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId
     ) {
         return ApiResponse.success(productService.getProduct(productId));
     }
@@ -104,11 +147,11 @@ public class ProductController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Products returned")
     @GetMapping
     public ApiResponse<PageResponse<ProductResponse>> searchProducts(
-            @Parameter(description = "Keyword matched against name, description, and tags") @RequestParam(required = false) String keyword,
-            @Parameter(description = "Product category") @RequestParam(required = false) String category,
-            @Parameter(description = "Whether the product is active") @RequestParam(required = false) Boolean active,
-            @Parameter(description = "Minimum product price") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Maximum product price") @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "Keyword matched against name, description, and tags", example = "keyboard") @RequestParam(required = false) String keyword,
+            @Parameter(description = "Product category", example = "Electronics") @RequestParam(required = false) String category,
+            @Parameter(description = "Whether the product is active", example = "true") @RequestParam(required = false) Boolean active,
+            @Parameter(description = "Minimum product price", example = "1000.00") @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Maximum product price", example = "10000.00") @RequestParam(required = false) BigDecimal maxPrice,
             @PageableDefault(size = 20) Pageable pageable
     ) {
         ProductSearchCriteria criteria = new ProductSearchCriteria(
@@ -137,7 +180,48 @@ public class ProductController {
     })
     @PutMapping("/{productId}")
     public ApiResponse<ProductResponse> updateProduct(
-            @Parameter(description = "MongoDB product ID") @PathVariable String productId,
+            @Parameter(description = "MongoDB product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Complete product state to save",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Update price and stock",
+                                            summary = "Keep product active",
+                                            value = """
+                                                    {
+                                                      "name": "Mechanical Keyboard Pro",
+                                                      "description": "Hot-swappable keyboard with RGB lighting and wireless mode",
+                                                      "category": "Electronics",
+                                                      "price": 7999.00,
+                                                      "currency": "INR",
+                                                      "availableQuantity": 30,
+                                                      "tags": ["keyboard", "gaming", "wireless"],
+                                                      "active": true
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Temporarily hide product",
+                                            summary = "Set active false",
+                                            value = """
+                                                    {
+                                                      "name": "Mechanical Keyboard Pro",
+                                                      "description": "Temporarily unavailable product",
+                                                      "category": "Electronics",
+                                                      "price": 7999.00,
+                                                      "currency": "INR",
+                                                      "availableQuantity": 0,
+                                                      "tags": ["keyboard", "gaming", "wireless"],
+                                                      "active": false
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
             @Valid @RequestBody UpdateProductRequest request
     ) {
         return ApiResponse.success(productService.updateProduct(productId, request), "Product updated");
@@ -156,7 +240,7 @@ public class ProductController {
     })
     @DeleteMapping("/{productId}")
     public ResponseEntity<Void> deactivateProduct(
-            @Parameter(description = "MongoDB product ID") @PathVariable String productId
+            @Parameter(description = "MongoDB product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId
     ) {
         productService.deactivateProduct(productId);
         return ResponseEntity.noContent().build();

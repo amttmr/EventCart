@@ -15,6 +15,8 @@ import com.eventcart.inventory.exception.InventoryReservationNotFoundException;
 import com.eventcart.inventory.mapper.InventoryMapper;
 import com.eventcart.inventory.repository.InventoryItemRepository;
 import com.eventcart.inventory.repository.InventoryReservationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,6 +28,8 @@ import java.util.Optional;
  */
 @Service
 public class InventoryService {
+    private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
+
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryReservationRepository reservationRepository;
     private final InventoryMapper inventoryMapper;
@@ -59,10 +63,15 @@ public class InventoryService {
      * @return saved inventory item response
      */
     public InventoryItemResponse upsertItem(String productId, UpsertInventoryItemRequest request) {
+        log.info("Upserting inventory item productId={} sku={} availableQuantity={}",
+                productId, request.sku(), request.availableQuantity());
         InventoryItemDocument item = inventoryItemRepository.findById(productId)
                 .orElseGet(InventoryItemDocument::new);
         inventoryMapper.updateItemDocument(productId, request, item);
-        return inventoryMapper.toItemResponse(inventoryItemRepository.save(item));
+        InventoryItemDocument savedItem = inventoryItemRepository.save(item);
+        log.info("Inventory item saved productId={} availableQuantity={} reservedQuantity={}",
+                savedItem.getProductId(), savedItem.getAvailableQuantity(), savedItem.getReservedQuantity());
+        return inventoryMapper.toItemResponse(savedItem);
     }
 
     /**
@@ -72,6 +81,7 @@ public class InventoryService {
      * @return inventory item response
      */
     public InventoryItemResponse getItem(String productId) {
+        log.debug("Fetching inventory item productId={}", productId);
         return inventoryMapper.toItemResponse(findItem(productId));
     }
 
@@ -82,8 +92,12 @@ public class InventoryService {
      * @return reservation response
      */
     public InventoryReservationResponse getReservation(String orderId) {
+        log.debug("Fetching inventory reservation orderId={}", orderId);
         return inventoryMapper.toReservationResponse(reservationRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new InventoryReservationNotFoundException("Reservation not found for order: " + orderId)));
+                .orElseThrow(() -> {
+                    log.warn("Inventory reservation not found orderId={}", orderId);
+                    return new InventoryReservationNotFoundException("Reservation not found for order: " + orderId);
+                }));
     }
 
     /**
@@ -93,14 +107,20 @@ public class InventoryService {
      * @return reservation result response
      */
     public InventoryReservationResponse reserveInventory(OrderCreatedEvent event) {
+        log.info("Reserving inventory orderId={} customerId={} itemCount={}",
+                event.orderId(), event.customerId(), event.items().size());
         Optional<InventoryReservationDocument> existingReservation = reservationRepository.findByOrderId(event.orderId());
         if (existingReservation.isPresent()) {
+            log.info("Skipping duplicate inventory reservation orderId={} reservationId={} status={}",
+                    event.orderId(), existingReservation.get().getId(), existingReservation.get().getStatus());
             return inventoryMapper.toReservationResponse(existingReservation.get());
         }
 
         Optional<String> failureReason = validateStock(event.items());
         if (failureReason.isPresent()) {
             InventoryReservationDocument failedReservation = saveFailedReservation(event, failureReason.get());
+            log.warn("Inventory reservation failed orderId={} reservationId={} reason={}",
+                    event.orderId(), failedReservation.getId(), failureReason.get());
             eventPublisher.publishInventoryFailed(inventoryMapper.toInventoryReservationFailedEvent(failedReservation));
             return inventoryMapper.toReservationResponse(failedReservation);
         }
@@ -113,6 +133,8 @@ public class InventoryService {
         reservation.setItems(reservedItems);
 
         InventoryReservationDocument savedReservation = reservationRepository.save(reservation);
+        log.info("Inventory reserved orderId={} reservationId={} itemCount={}",
+                event.orderId(), savedReservation.getId(), savedReservation.getItems().size());
         eventPublisher.publishInventoryReserved(inventoryMapper.toInventoryReservedEvent(savedReservation));
         return inventoryMapper.toReservationResponse(savedReservation);
     }
@@ -125,7 +147,10 @@ public class InventoryService {
      */
     private InventoryItemDocument findItem(String productId) {
         return inventoryItemRepository.findById(productId)
-                .orElseThrow(() -> new InventoryItemNotFoundException("Inventory item not found: " + productId));
+                .orElseThrow(() -> {
+                    log.warn("Inventory item not found productId={}", productId);
+                    return new InventoryItemNotFoundException("Inventory item not found: " + productId);
+                });
     }
 
     /**
@@ -137,15 +162,19 @@ public class InventoryService {
     private Optional<String> validateStock(List<OrderCreatedItem> items) {
         for (OrderCreatedItem item : items) {
             if (item.quantity() <= 0) {
+                log.warn("Invalid reservation quantity productId={} quantity={}", item.productId(), item.quantity());
                 return Optional.of("Invalid reservation quantity for product: " + item.productId());
             }
 
             Optional<InventoryItemDocument> stock = inventoryItemRepository.findById(item.productId());
             if (stock.isEmpty()) {
+                log.warn("Reservation stock check failed because product has no stock document productId={}", item.productId());
                 return Optional.of("No inventory stock found for product: " + item.productId());
             }
 
             if (stock.get().getAvailableQuantity() < item.quantity()) {
+                log.warn("Reservation stock check failed productId={} availableQuantity={} requestedQuantity={}",
+                        item.productId(), stock.get().getAvailableQuantity(), item.quantity());
                 return Optional.of("Insufficient stock for product: " + item.productId());
             }
         }
@@ -166,6 +195,8 @@ public class InventoryService {
             stock.setAvailableQuantity(stock.getAvailableQuantity() - item.quantity());
             stock.setReservedQuantity(stock.getReservedQuantity() + item.quantity());
             inventoryItemRepository.save(stock);
+            log.debug("Reserved stock productId={} quantity={} availableQuantity={} reservedQuantity={}",
+                    item.productId(), item.quantity(), stock.getAvailableQuantity(), stock.getReservedQuantity());
             reservedItems.add(inventoryMapper.toReservationItem(item));
         }
 

@@ -10,6 +10,8 @@ import com.eventcart.cart.dto.UpdateCartItemQuantityRequest;
 import com.eventcart.cart.exception.CartItemNotFoundException;
 import com.eventcart.cart.mapper.CartMapper;
 import com.eventcart.cart.repository.CartRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,6 +23,8 @@ import java.util.stream.IntStream;
  */
 @Service
 public class CartService {
+    private static final Logger log = LoggerFactory.getLogger(CartService.class);
+
     private final CartRepository cartRepository;
     private final CartMapper cartMapper;
     private final CatalogClient catalogClient;
@@ -45,6 +49,7 @@ public class CartService {
      * @return cart response
      */
     public CartResponse getCart(String customerId) {
+        log.debug("Fetching cart customerId={}", customerId);
         return cartMapper.toResponse(findOrCreateCart(customerId));
     }
 
@@ -61,6 +66,8 @@ public class CartService {
      * @return updated cart response
      */
     public CartResponse addItem(String customerId, AddCartItemRequest request) {
+        log.info("Adding cart item customerId={} productId={} quantity={}",
+                customerId, request.productId(), request.quantity());
         CatalogProductResponse product = catalogClient.getProduct(request.productId());
         CartDocument cart = findOrCreateCart(customerId);
         Optional<CartItemDocument> existingItem = findItem(cart, request.productId());
@@ -69,11 +76,18 @@ public class CartService {
             CartItemDocument item = existingItem.get();
             cartMapper.refreshItemSnapshot(item, product);
             item.setQuantity(item.getQuantity() + request.quantity());
+            log.debug("Incremented existing cart item customerId={} productId={} newQuantity={}",
+                    customerId, request.productId(), item.getQuantity());
         } else {
             cart.getItems().add(cartMapper.toItemDocument(product, request.quantity()));
+            log.debug("Added new cart item customerId={} productId={}", customerId, request.productId());
         }
 
-        return cartMapper.toResponse(cartRepository.save(cart));
+        CartDocument savedCart = cartRepository.save(cart);
+        CartResponse response = cartMapper.toResponse(savedCart);
+        log.info("Cart item added customerId={} cartId={} totalItems={} subtotal={}",
+                customerId, response.cartId(), response.totalItems(), response.subtotal());
+        return response;
     }
 
     /**
@@ -89,12 +103,21 @@ public class CartService {
             String productId,
             UpdateCartItemQuantityRequest request
     ) {
+        log.info("Updating cart item quantity customerId={} productId={} quantity={}",
+                customerId, productId, request.quantity());
         CartDocument cart = findOrCreateCart(customerId);
         CartItemDocument item = findItem(cart, productId)
-                .orElseThrow(() -> new CartItemNotFoundException("Product not found in cart: " + productId));
+                .orElseThrow(() -> {
+                    log.warn("Cart item quantity update failed because product is missing customerId={} productId={}",
+                            customerId, productId);
+                    return new CartItemNotFoundException("Product not found in cart: " + productId);
+                });
 
         item.setQuantity(request.quantity());
-        return cartMapper.toResponse(cartRepository.save(cart));
+        CartResponse response = cartMapper.toResponse(cartRepository.save(cart));
+        log.info("Cart item quantity updated customerId={} productId={} totalItems={}",
+                customerId, productId, response.totalItems());
+        return response;
     }
 
     /**
@@ -105,10 +128,14 @@ public class CartService {
      * @return updated cart response
      */
     public CartResponse removeItem(String customerId, String productId) {
+        log.info("Removing cart item customerId={} productId={}", customerId, productId);
         CartDocument cart = findOrCreateCart(customerId);
         int itemIndex = findItemIndex(cart, productId);
         cart.getItems().remove(itemIndex);
-        return cartMapper.toResponse(cartRepository.save(cart));
+        CartResponse response = cartMapper.toResponse(cartRepository.save(cart));
+        log.info("Cart item removed customerId={} productId={} totalItems={}",
+                customerId, productId, response.totalItems());
+        return response;
     }
 
     /**
@@ -117,9 +144,11 @@ public class CartService {
      * @param customerId customer ID
      */
     public void clearCart(String customerId) {
+        log.info("Clearing cart customerId={}", customerId);
         CartDocument cart = findOrCreateCart(customerId);
         cart.getItems().clear();
         cartRepository.save(cart);
+        log.info("Cart cleared customerId={} cartId={}", customerId, cart.getId());
     }
 
     /**
@@ -142,7 +171,9 @@ public class CartService {
     private CartDocument createCart(String customerId) {
         CartDocument cart = new CartDocument();
         cart.setCustomerId(customerId);
-        return cartRepository.save(cart);
+        CartDocument savedCart = cartRepository.save(cart);
+        log.info("Created new cart customerId={} cartId={}", customerId, savedCart.getId());
+        return savedCart;
     }
 
     /**
@@ -171,6 +202,10 @@ public class CartService {
         return IntStream.range(0, items.size())
                 .filter(index -> items.get(index).getProductId().equals(productId))
                 .findFirst()
-                .orElseThrow(() -> new CartItemNotFoundException("Product not found in cart: " + productId));
+                .orElseThrow(() -> {
+                    log.warn("Cart item not found cartId={} customerId={} productId={}",
+                            cart.getId(), cart.getCustomerId(), productId);
+                    return new CartItemNotFoundException("Product not found in cart: " + productId);
+                });
     }
 }

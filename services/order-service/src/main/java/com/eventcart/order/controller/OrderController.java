@@ -6,6 +6,8 @@ import com.eventcart.order.dto.PlaceOrderRequest;
 import com.eventcart.order.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,7 +51,36 @@ public class OrderController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Cart service unavailable")
     })
     @PostMapping
-    public ApiResponse<OrderResponse> placeOrder(@Valid @RequestBody PlaceOrderRequest request) {
+    public ApiResponse<OrderResponse> placeOrder(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Customer whose cart should be converted into an order",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Place order for demo customer",
+                                            summary = "Uses the cart for customer-1",
+                                            value = """
+                                                    {
+                                                      "customerId": "customer-1"
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Place order for another customer",
+                                            summary = "Same API for any customer cart",
+                                            value = """
+                                                    {
+                                                      "customerId": "customer-2"
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
+            @Valid @RequestBody PlaceOrderRequest request
+    ) {
         return ApiResponse.success(orderService.placeOrder(request), "Order placed");
     }
 
@@ -66,7 +97,7 @@ public class OrderController {
     })
     @GetMapping("/{orderId}")
     public ApiResponse<OrderResponse> getOrder(
-            @Parameter(description = "Order ID") @PathVariable String orderId
+            @Parameter(description = "Order ID", example = "66b1f9f48f8c1c4df8f8a001") @PathVariable String orderId
     ) {
         return ApiResponse.success(orderService.getOrder(orderId));
     }
@@ -81,7 +112,7 @@ public class OrderController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Orders returned")
     @GetMapping("/customer/{customerId}")
     public ApiResponse<List<OrderResponse>> getOrdersForCustomer(
-            @Parameter(description = "Customer ID") @PathVariable String customerId
+            @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {
         return ApiResponse.success(orderService.getOrdersForCustomer(customerId));
     }

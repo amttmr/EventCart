@@ -8,6 +8,7 @@ OpenAPI gives us:
 
 - Interactive API testing through Swagger UI.
 - Machine-readable API contracts at `/v3/api-docs`.
+- Request payload examples for common API use cases.
 - Better communication between frontend, backend, QA, and platform teams.
 - Interview-ready proof that the application has documented APIs.
 
@@ -124,6 +125,7 @@ You should be able to explain:
 - OpenAPI is a contract format for REST APIs.
 - Swagger UI is an interactive UI generated from OpenAPI.
 - Annotations such as `@Operation` and `@Tag` improve generated docs.
+- Annotations such as `@ExampleObject` and `@Schema(example = "...")` make APIs easier to try from Swagger UI.
 - API documentation helps consumers understand request bodies, responses, status codes, and failure cases.
 - OpenAPI does not replace tests; it documents the contract, while tests verify behavior.
 - API documentation should show service boundaries clearly. In this flow, clients do not send product price to cart-service.

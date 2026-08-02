@@ -1,5 +1,6 @@
 package com.eventcart.order.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
 /**
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
  * @param customerId customer whose cart should be converted into an order
  */
 public record PlaceOrderRequest(
+        @Schema(description = "Customer whose current cart should be converted into an order", example = "customer-1")
         @NotBlank(message = "Customer ID is required")
         String customerId
 ) {

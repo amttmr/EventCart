@@ -7,6 +7,8 @@ import com.eventcart.inventory.dto.UpsertInventoryItemRequest;
 import com.eventcart.inventory.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,7 +50,38 @@ public class InventoryController {
     })
     @PutMapping("/{productId}")
     public ApiResponse<InventoryItemResponse> upsertItem(
-            @Parameter(description = "Product ID") @PathVariable String productId,
+            @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Inventory stock to create or replace for one product",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "Seed enough stock",
+                                            summary = "Happy path for reservation",
+                                            value = """
+                                                    {
+                                                      "sku": "SKU-1001",
+                                                      "productName": "Mechanical Keyboard",
+                                                      "availableQuantity": 25
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "Out of stock",
+                                            summary = "Use this to test InventoryReservationFailed",
+                                            value = """
+                                                    {
+                                                      "sku": "SKU-1001",
+                                                      "productName": "Mechanical Keyboard",
+                                                      "availableQuantity": 0
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
             @Valid @RequestBody UpsertInventoryItemRequest request
     ) {
         return ApiResponse.success(inventoryService.upsertItem(productId, request), "Inventory item saved");
@@ -67,7 +100,7 @@ public class InventoryController {
     })
     @GetMapping("/{productId}")
     public ApiResponse<InventoryItemResponse> getItem(
-            @Parameter(description = "Product ID") @PathVariable String productId
+            @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId
     ) {
         return ApiResponse.success(inventoryService.getItem(productId));
     }
@@ -85,7 +118,7 @@ public class InventoryController {
     })
     @GetMapping("/reservations/{orderId}")
     public ApiResponse<InventoryReservationResponse> getReservation(
-            @Parameter(description = "Order ID") @PathVariable String orderId
+            @Parameter(description = "Order ID", example = "66b1f9f48f8c1c4df8f8a001") @PathVariable String orderId
     ) {
         return ApiResponse.success(inventoryService.getReservation(orderId));
     }
