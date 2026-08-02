@@ -1,0 +1,7 @@
+spring:
+  mongodb:
+    uri: mongodb://localhost:27017/eventcart_cart_test
+  data:
+    mongodb:
+      auto-index-creation: true
+

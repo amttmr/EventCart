@@ -8,6 +8,18 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Request body used to create a product in the catalog.
+ *
+ * @param sku business-facing stock keeping unit
+ * @param name product display name
+ * @param description optional product description
+ * @param category product category used for filtering and browsing
+ * @param price product price
+ * @param currency currency code for the price
+ * @param availableQuantity current available quantity
+ * @param tags searchable product tags
+ */
 public record CreateProductRequest(
         @NotBlank(message = "SKU is required")
         String sku,
@@ -33,4 +45,3 @@ public record CreateProductRequest(
         List<String> tags
 ) {
 }
-

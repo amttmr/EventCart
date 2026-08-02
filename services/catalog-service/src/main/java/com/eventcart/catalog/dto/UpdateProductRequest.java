@@ -8,6 +8,18 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Request body used to update an existing product.
+ *
+ * @param name updated product display name
+ * @param description updated product description
+ * @param category updated category
+ * @param price updated price
+ * @param currency updated currency code
+ * @param availableQuantity updated available quantity
+ * @param tags updated searchable tags
+ * @param active updated active flag
+ */
 public record UpdateProductRequest(
         @NotBlank(message = "Product name is required")
         String name,
@@ -32,4 +44,3 @@ public record UpdateProductRequest(
         boolean active
 ) {
 }
-

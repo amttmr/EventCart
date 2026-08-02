@@ -23,10 +23,12 @@
         <module>common/common-web</module>
         <module>common/common-test</module>
         <module>services/catalog-service</module>
+        <module>services/cart-service</module>
     </modules>
 
     <properties>
         <java.version>21</java.version>
+        <springdoc-openapi.version>3.0.3</springdoc-openapi.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -49,6 +51,11 @@
                 <artifactId>common-test</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc-openapi.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -63,4 +70,3 @@
         </pluginManagement>
     </build>
 </project>
-

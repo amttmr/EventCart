@@ -23,12 +23,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Application service that owns product catalog business operations.
+ *
+ * <p>The controller layer delegates to this class so validation, lookup,
+ * duplicate checks, MongoDB query construction, and persistence behavior remain
+ * outside HTTP-specific code.</p>
+ */
 @Service
 public class ProductService {
     private final ProductRepository productRepository;
     private final MongoTemplate mongoTemplate;
     private final ProductMapper productMapper;
 
+    /**
+     * Creates a product service with repository, MongoTemplate, and mapper dependencies.
+     *
+     * @param productRepository repository for standard product persistence
+     * @param mongoTemplate MongoDB template used for dynamic search queries
+     * @param productMapper mapper between DTOs and documents
+     */
     public ProductService(
             ProductRepository productRepository,
             MongoTemplate mongoTemplate,
@@ -39,6 +53,12 @@ public class ProductService {
         this.productMapper = productMapper;
     }
 
+    /**
+     * Creates a new product after enforcing SKU uniqueness.
+     *
+     * @param request validated create-product request
+     * @return created product response
+     */
     public ProductResponse createProduct(CreateProductRequest request) {
         if (productRepository.existsBySku(request.sku())) {
             throw new DuplicateResourceException("Product SKU already exists: " + request.sku());
@@ -48,10 +68,23 @@ public class ProductService {
         return productMapper.toResponse(savedProduct);
     }
 
+    /**
+     * Retrieves one product by ID.
+     *
+     * @param productId MongoDB product ID
+     * @return product response
+     */
     public ProductResponse getProduct(String productId) {
         return productMapper.toResponse(findProduct(productId));
     }
 
+    /**
+     * Searches products using optional filters and pagination.
+     *
+     * @param criteria search filters supplied by the controller
+     * @param pageable pagination and sorting information
+     * @return page of matching products
+     */
     public Page<ProductResponse> searchProducts(ProductSearchCriteria criteria, Pageable pageable) {
         Query query = buildSearchQuery(criteria).with(pageable);
         Query countQuery = buildSearchQuery(criteria);
@@ -65,23 +98,50 @@ public class ProductService {
         return new PageImpl<>(products, pageable, total);
     }
 
+    /**
+     * Updates an existing product.
+     *
+     * @param productId MongoDB product ID
+     * @param request validated update-product request
+     * @return updated product response
+     */
     public ProductResponse updateProduct(String productId, UpdateProductRequest request) {
         ProductDocument product = findProduct(productId);
         productMapper.updateDocument(product, request);
         return productMapper.toResponse(productRepository.save(product));
     }
 
+    /**
+     * Marks a product inactive without physically deleting it.
+     *
+     * <p>Soft deletion keeps old references safer when carts or orders already
+     * contain product snapshots.</p>
+     *
+     * @param productId MongoDB product ID
+     */
     public void deactivateProduct(String productId) {
         ProductDocument product = findProduct(productId);
         product.setActive(false);
         productRepository.save(product);
     }
 
+    /**
+     * Loads a product or throws a not-found exception.
+     *
+     * @param productId MongoDB product ID
+     * @return product document
+     */
     private ProductDocument findProduct(String productId) {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
     }
 
+    /**
+     * Builds a dynamic MongoDB query from optional product search criteria.
+     *
+     * @param criteria search filters supplied by the API layer
+     * @return MongoDB query containing only the requested filters
+     */
     private Query buildSearchQuery(ProductSearchCriteria criteria) {
         List<Criteria> filters = new ArrayList<>();
 

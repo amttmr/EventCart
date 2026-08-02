@@ -1,0 +1,43 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: cart-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_cart?authSource=admin
+  data:
+    mongodb:
+      auto-index-creation: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: cart-service
+    description: Shopping cart service for EventCart
+
+logging:
+  level:
+    com.eventcart: INFO
+

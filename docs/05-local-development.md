@@ -19,10 +19,18 @@ Implemented so far:
   - Product deactivation.
   - MongoDB document model and indexes.
   - Request validation and global error handling.
+- `cart-service`
+  - Customer cart lookup.
+  - Add item to cart.
+  - Update item quantity.
+  - Remove item from cart.
+  - Clear cart.
+  - MongoDB embedded cart item model.
 - Docker Compose:
   - MongoDB
   - Kafka
   - Redis
+- OpenAPI/Swagger UI for service APIs.
 
 ## Important Java Note
 
@@ -77,6 +85,12 @@ Build only the catalog service and required modules:
 mvn -pl services/catalog-service -am clean verify
 ```
 
+Build only the cart service and required modules:
+
+```powershell
+mvn -pl services/cart-service -am clean verify
+```
+
 ## Run Catalog Service
 
 ```powershell
@@ -93,6 +107,38 @@ Health endpoint:
 
 ```text
 http://localhost:8081/actuator/health
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8081/swagger-ui.html
+http://localhost:8081/v3/api-docs
+```
+
+## Run Cart Service
+
+```powershell
+mvn -pl services/cart-service spring-boot:run
+```
+
+The service runs on:
+
+```text
+http://localhost:8082
+```
+
+Health endpoint:
+
+```text
+http://localhost:8082/actuator/health
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8082/swagger-ui.html
+http://localhost:8082/v3/api-docs
 ```
 
 ## Product API Examples
@@ -155,6 +201,57 @@ Deactivate product:
 Invoke-RestMethod -Method Delete "http://localhost:8081/api/v1/products/<product-id>"
 ```
 
+## Cart API Examples
+
+Get customer cart:
+
+```powershell
+Invoke-RestMethod "http://localhost:8082/api/v1/carts/customer-1"
+```
+
+Add item to cart:
+
+```powershell
+$body = @{
+  productId = "<product-id>"
+  sku = "SKU-1001"
+  productName = "Mechanical Keyboard"
+  unitPrice = 6999.00
+  currency = "INR"
+  quantity = 2
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8082/api/v1/carts/customer-1/items" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Update item quantity:
+
+```powershell
+$body = @{
+  quantity = 3
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Put `
+  -Uri "http://localhost:8082/api/v1/carts/customer-1/items/<product-id>" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Remove item:
+
+```powershell
+Invoke-RestMethod -Method Delete "http://localhost:8082/api/v1/carts/customer-1/items/<product-id>"
+```
+
+Clear cart:
+
+```powershell
+Invoke-RestMethod -Method Delete "http://localhost:8082/api/v1/carts/customer-1"
+```
+
 ## What This Teaches
 
 This first slice covers:
@@ -170,6 +267,8 @@ This first slice covers:
 - Optimistic locking with `@Version`.
 - Global exception handling.
 - Docker Compose infrastructure.
+- OpenAPI and Swagger UI.
+- Embedded MongoDB document modeling for cart items.
 
 ## Spring Boot 4 MongoDB Configuration Note
 
@@ -195,3 +294,5 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 5. What does optimistic locking solve?
 6. Why should APIs use DTOs instead of database documents directly?
 7. What is the purpose of Docker Compose in local development?
+8. Why is a cart a good example for embedded MongoDB documents?
+9. What problem does OpenAPI solve for REST APIs?

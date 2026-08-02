@@ -9,9 +9,16 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Unit tests for {@link ProductMapper}.
+ */
 class ProductMapperTest {
     private final ProductMapper productMapper = new ProductMapper();
 
+    /**
+     * Verifies that create-product requests are mapped to product documents
+     * with normalized currency and active status.
+     */
     @Test
     void toDocumentShouldMapCreateRequest() {
         CreateProductRequest request = new CreateProductRequest(
@@ -34,4 +41,3 @@ class ProductMapperTest {
         assertThat(product.isActive()).isTrue();
     }
 }
-

@@ -6,8 +6,20 @@ import com.eventcart.catalog.dto.ProductResponse;
 import com.eventcart.catalog.dto.UpdateProductRequest;
 import org.springframework.stereotype.Component;
 
+/**
+ * Maps between product DTOs and MongoDB product documents.
+ *
+ * <p>Keeping mapping code out of controllers and services makes the API layer,
+ * business layer, and persistence model easier to change independently.</p>
+ */
 @Component
 public class ProductMapper {
+    /**
+     * Converts a create request into a new product document.
+     *
+     * @param request validated create-product request
+     * @return product document ready to be persisted
+     */
     public ProductDocument toDocument(CreateProductRequest request) {
         ProductDocument product = new ProductDocument();
         product.setSku(request.sku());
@@ -22,6 +34,12 @@ public class ProductMapper {
         return product;
     }
 
+    /**
+     * Applies update request values to an existing product document.
+     *
+     * @param product existing product document loaded from MongoDB
+     * @param request validated update-product request
+     */
     public void updateDocument(ProductDocument product, UpdateProductRequest request) {
         product.setName(request.name());
         product.setDescription(request.description());
@@ -33,6 +51,12 @@ public class ProductMapper {
         product.setActive(request.active());
     }
 
+    /**
+     * Converts a product document into the public API response shape.
+     *
+     * @param product persisted product document
+     * @return product response returned by REST APIs
+     */
     public ProductResponse toResponse(ProductDocument product) {
         return new ProductResponse(
                 product.getId(),
@@ -51,4 +75,3 @@ public class ProductMapper {
         );
     }
 }
-

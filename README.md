@@ -31,6 +31,7 @@ Start here:
 4. [Learning and Interview Roadmap](docs/03-learning-and-interview-roadmap.md)
 5. [Documentation Standards](docs/04-documentation-standards.md)
 6. [Local Development](docs/05-local-development.md)
+7. [API Documentation](docs/06-api-documentation.md)
 
 ## Planned Services
 
