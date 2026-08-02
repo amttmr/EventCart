@@ -43,11 +43,11 @@ public class OrderController {
      * @param request validated place-order request
      * @return created order response
      */
-    @Operation(summary = "Place order", description = "Creates an order from the customer's current cart and publishes OrderCreated to Kafka.")
+    @Operation(summary = "Place order", description = "Creates an order from the customer's current cart and publishes OrderCreated to Kafka. Optional idempotencyKey makes client retries safe.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Order placed"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Cart is empty"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Cart is empty or idempotency key is already processing"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Cart service unavailable")
     })
     @PostMapping
@@ -59,17 +59,18 @@ public class OrderController {
                             mediaType = "application/json",
                             examples = {
                                     @ExampleObject(
-                                            name = "Place order for demo customer",
-                                            summary = "Uses the cart for customer-1",
+                                            name = "Place order with idempotency",
+                                            summary = "Recommended request for safe client retries",
                                             value = """
                                                     {
-                                                      "customerId": "customer-1"
+                                                      "customerId": "customer-1",
+                                                      "idempotencyKey": "customer-1-order-20260802-001"
                                                     }
                                                     """
                                     ),
                                     @ExampleObject(
-                                            name = "Place order for another customer",
-                                            summary = "Same API for any customer cart",
+                                            name = "Place order without idempotency",
+                                            summary = "Works for demos but retrying this request could create duplicates",
                                             value = """
                                                     {
                                                       "customerId": "customer-2"

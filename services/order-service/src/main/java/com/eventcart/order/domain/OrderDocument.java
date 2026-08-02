@@ -32,6 +32,8 @@ public class OrderDocument {
     @Indexed
     private OrderStatus status = OrderStatus.CREATED;
 
+    private String statusReason;
+
     @Version
     private Long version;
 
@@ -147,6 +149,24 @@ public class OrderDocument {
      */
     public void setStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    /**
+     * Returns an optional explanation for the current status.
+     *
+     * @return status reason
+     */
+    public String getStatusReason() {
+        return statusReason;
+    }
+
+    /**
+     * Sets an optional explanation for the current status.
+     *
+     * @param statusReason status reason
+     */
+    public void setStatusReason(String statusReason) {
+        this.statusReason = statusReason;
     }
 
     /**

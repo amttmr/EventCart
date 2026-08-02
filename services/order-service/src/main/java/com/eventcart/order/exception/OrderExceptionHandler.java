@@ -57,6 +57,19 @@ public class OrderExceptionHandler {
     }
 
     /**
+     * Handles duplicate order placement attempts for the same idempotency key.
+     *
+     * @param ex duplicate order request exception
+     * @param request current HTTP request
+     * @return standardized API error response
+     */
+    @ExceptionHandler(DuplicateOrderRequestException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiError handleDuplicateOrderRequest(DuplicateOrderRequestException ex, HttpServletRequest request) {
+        return ApiError.of("DUPLICATE_ORDER_REQUEST", ex.getMessage(), request.getRequestURI());
+    }
+
+    /**
      * Handles request validation failures.
      *
      * @param ex validation exception raised by Spring MVC

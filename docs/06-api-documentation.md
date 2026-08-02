@@ -64,9 +64,14 @@ Place order request:
 
 ```json
 {
-  "customerId": "customer-1"
+  "customerId": "customer-1",
+  "idempotencyKey": "customer-1-order-20260802-001"
 }
 ```
+
+`idempotencyKey` is optional, but recommended. It lets a frontend or API client retry the same order request without accidentally creating a duplicate order.
+
+After the order is created, order-service returns the order with status `CREATED`. inventory-service processes the Kafka event asynchronously, then order-service updates the order to `INVENTORY_RESERVED` or `INVENTORY_FAILED`.
 
 ## Inventory APIs
 
@@ -129,3 +134,4 @@ You should be able to explain:
 - API documentation helps consumers understand request bodies, responses, status codes, and failure cases.
 - OpenAPI does not replace tests; it documents the contract, while tests verify behavior.
 - API documentation should show service boundaries clearly. In this flow, clients do not send product price to cart-service.
+- OpenAPI examples should demonstrate operationally safer requests, such as order placement with an `idempotencyKey`.

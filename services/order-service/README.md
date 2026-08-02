@@ -1,19 +1,23 @@
 # order-service
 
-`order-service` owns order placement and the first order lifecycle state for EventCart.
+`order-service` owns order placement and order lifecycle updates for EventCart.
 
 ## Responsibility
 
-This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, and publishes an `OrderCreated` Kafka event for downstream services.
+This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, publishes an `OrderCreated` Kafka event, consumes inventory result events, updates order status, and clears the cart after successful inventory reservation.
 
 ## Current Functionality
 
 | Feature | Description |
 | --- | --- |
 | Place order | Accepts a customer ID, fetches the customer's cart, and creates an order |
+| Redis idempotency | Uses an optional `idempotencyKey` to make order-placement retries safe |
 | Cart lookup | Uses Spring RestClient to call cart-service with timeout and error handling |
 | Order snapshot | Stores cart item snapshots inside the order document |
 | Kafka producer | Publishes `OrderCreatedEvent` to the `eventcart.orders.created` topic |
+| Kafka consumers | Consumes `InventoryReservedEvent` and `InventoryReservationFailedEvent` |
+| Order status updates | Moves orders from `CREATED` to `INVENTORY_RESERVED` or `INVENTORY_FAILED` |
+| Cart cleanup | Clears the customer's cart after inventory has been reserved |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs
@@ -28,9 +32,30 @@ This service creates an order from the customer's cart. It calls cart-service, s
 
 ```json
 {
-  "customerId": "customer-1"
+  "customerId": "customer-1",
+  "idempotencyKey": "customer-1-order-20260802-001"
 }
 ```
+
+`idempotencyKey` is optional, but recommended for real clients. If the same completed key is submitted again, order-service returns the original order instead of creating a duplicate.
+
+## Kafka Topics
+
+| Topic | Direction | Purpose |
+| --- | --- | --- |
+| `eventcart.orders.created` | Produces | Notifies inventory-service that an order exists |
+| `eventcart.inventory.reserved` | Consumes | Updates order status to `INVENTORY_RESERVED` |
+| `eventcart.inventory.failed` | Consumes | Updates order status to `INVENTORY_FAILED` with a reason |
+
+## Redis Usage
+
+Order idempotency keys are stored in Redis using the prefix:
+
+```text
+eventcart:orders:idempotency:
+```
+
+The local TTL is configured as `30m` in `application.yml`.
 
 ## Local URLs
 
@@ -43,4 +68,4 @@ This service creates an order from the customer's cart. It calls cart-service, s
 
 ## Interview Angle
 
-This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Kafka event publishing, and the consistency risk of saving to MongoDB and publishing to Kafka without an outbox pattern.
+This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Redis idempotency, Kafka event publishing and consumption, eventual consistency, and the consistency risk of saving to MongoDB and publishing to Kafka without an outbox pattern.

@@ -67,4 +67,31 @@ public class CartClient {
             throw new CartServiceUnavailableException("Cart service is unavailable", ex);
         }
     }
+
+    /**
+     * Clears the active cart for one customer.
+     *
+     * @param customerId customer ID
+     */
+    public void clearCart(String customerId) {
+        log.info("Calling cart-service to clear cart customerId={}", customerId);
+        try {
+            cartRestClient
+                    .delete()
+                    .uri("/api/v1/carts/{customerId}", customerId)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, (request, clientResponse) -> {
+                        log.warn("Cart clear rejected by cart-service customerId={} status={}",
+                                customerId, clientResponse.getStatusCode());
+                        throw new CartServiceUnavailableException("Cart service rejected cart clear for customer: " + customerId);
+                    })
+                    .toBodilessEntity();
+            log.info("Cart clear completed customerId={}", customerId);
+        } catch (CartServiceUnavailableException ex) {
+            throw ex;
+        } catch (RestClientException ex) {
+            log.warn("Cart clear call failed customerId={}", customerId, ex);
+            throw new CartServiceUnavailableException("Cart service is unavailable", ex);
+        }
+    }
 }

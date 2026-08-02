@@ -31,7 +31,11 @@ Implemented so far:
   - Place order from cart.
   - Fetch cart details from cart-service.
   - Store order snapshot in MongoDB.
+  - Use Redis idempotency keys for safe order-placement retries.
   - Publish `OrderCreatedEvent` to Kafka.
+  - Consume inventory reservation result events.
+  - Update order status to `INVENTORY_RESERVED` or `INVENTORY_FAILED`.
+  - Clear the cart after successful inventory reservation.
 - `inventory-service`
   - Seed product stock for local testing.
   - Consume `OrderCreatedEvent` from Kafka.
@@ -40,7 +44,7 @@ Implemented so far:
 - Docker Compose:
   - MongoDB
   - Kafka
-  - Redis
+  - Redis for order idempotency keys
 - OpenAPI/Swagger UI for service APIs.
 
 ## Important Java Note
@@ -182,7 +186,7 @@ http://localhost:8082/v3/api-docs
 
 ## Run Order Service
 
-Start cart-service first because order-service calls it when placing orders.
+Start cart-service first because order-service calls it when placing orders. Start Redis through Docker Compose because order-service stores idempotency keys there.
 
 ```powershell
 mvn -pl services/order-service spring-boot:run
@@ -379,6 +383,7 @@ Place order from the customer's cart:
 ```powershell
 $body = @{
   customerId = "customer-1"
+  idempotencyKey = "customer-1-order-20260802-001"
 } | ConvertTo-Json
 
 Invoke-RestMethod -Method Post `
@@ -387,13 +392,21 @@ Invoke-RestMethod -Method Post `
   -Body $body
 ```
 
-When order-service places the order, it publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result.
+When order-service places the order, it stores an idempotency key in Redis and publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result.
+
+Check order status by order ID:
+
+```powershell
+Invoke-RestMethod "http://localhost:8083/api/v1/orders/<order-id>"
+```
 
 Check reservation result by order ID:
 
 ```powershell
 Invoke-RestMethod "http://localhost:8084/api/v1/inventory/reservations/<order-id>"
 ```
+
+After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
 
 ## What This Teaches
 
@@ -414,8 +427,10 @@ This first slice covers:
 - Embedded MongoDB document modeling for cart items.
 - Synchronous service-to-service communication with Spring RestClient.
 - Timeout handling and remote-service error mapping.
+- Redis idempotency for safe order-placement retries.
 - Kafka producer basics with `OrderCreatedEvent`.
 - Kafka consumer basics with inventory reservation.
+- Kafka consumer basics with order status updates from inventory result events.
 - Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
@@ -450,3 +465,5 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 13. What problem does Kafka solve between order-service and inventory-service?
 14. Why is idempotency important for Kafka consumers?
 15. What is the outbox pattern, and why will we need it later?
+16. How does Redis-based idempotency protect order creation from duplicate client retries?
+17. Why do we clear the cart after inventory reservation instead of immediately after order creation?

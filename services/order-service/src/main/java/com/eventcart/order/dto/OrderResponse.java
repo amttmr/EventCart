@@ -15,6 +15,7 @@ import java.util.List;
  * @param totalAmount order total amount
  * @param currency currency code
  * @param status current order status
+ * @param statusReason optional explanation for the current status
  * @param version optimistic locking version maintained by MongoDB/Spring Data
  * @param createdAt time when the order was created
  * @param updatedAt time when the order was last modified
@@ -26,6 +27,7 @@ public record OrderResponse(
         BigDecimal totalAmount,
         String currency,
         OrderStatus status,
+        String statusReason,
         Long version,
         Instant createdAt,
         Instant updatedAt

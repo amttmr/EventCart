@@ -12,14 +12,16 @@ This document explains the first Kafka-based business flow in EventCart.
 6. inventory-service checks its local stock in MongoDB.
 7. inventory-service stores a reservation result.
 8. inventory-service publishes either `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
+9. order-service consumes the inventory result event.
+10. order-service updates the order status and clears the cart only after successful inventory reservation.
 
 ## Topics
 
 | Topic | Producer | Consumer | Purpose |
 | --- | --- | --- | --- |
 | `eventcart.orders.created` | order-service | inventory-service | Tells downstream services an order was placed |
-| `eventcart.inventory.reserved` | inventory-service | Future order-service/payment-service | Tells the system stock was reserved |
-| `eventcart.inventory.failed` | inventory-service | Future order-service/notification-service | Tells the system stock could not be reserved |
+| `eventcart.inventory.reserved` | inventory-service | order-service, future payment-service | Tells the system stock was reserved |
+| `eventcart.inventory.failed` | inventory-service | order-service, future notification-service | Tells the system stock could not be reserved |
 
 ## MongoDB Collections
 
@@ -29,11 +31,29 @@ This document explains the first Kafka-based business flow in EventCart.
 | inventory-service | `eventcart_inventory` | `inventory_items` | Stores product stock |
 | inventory-service | `eventcart_inventory` | `inventory_reservations` | Stores reservation results |
 
+## Redis Keys
+
+order-service uses Redis to store order idempotency keys:
+
+```text
+eventcart:orders:idempotency:<client-key>
+```
+
+The value starts as `IN_PROGRESS`. After the order is saved, it becomes `ORDER:<order-id>`. If the same completed key is retried, order-service returns the original order.
+
 ## Why Kafka Here?
 
 Inventory reservation does not need to block the initial order API forever. Kafka lets order-service say "an order was created" and lets inventory-service react independently.
 
 This introduces eventual consistency. Immediately after the order API returns, inventory may still be processing the event. The client or another service can check the order/reservation status later.
+
+The order status is the user-facing view of that eventual consistency:
+
+| Status | Meaning |
+| --- | --- |
+| `CREATED` | Order is saved and waiting for inventory result |
+| `INVENTORY_RESERVED` | Stock was reserved and the customer's cart cleanup was triggered |
+| `INVENTORY_FAILED` | Stock could not be reserved; `statusReason` explains why |
 
 ## Current Limitations
 
@@ -43,6 +63,7 @@ This first implementation intentionally keeps the event flow simple:
 - inventory-service updates stock and saves the reservation directly.
 - There is no retry topic, dead-letter topic, distributed tracing, or outbox pattern yet.
 - Kafka producer and consumer infrastructure is configured explicitly in the services so the project does not depend on hidden auto-configuration.
+- Cart cleanup after inventory reservation is best-effort. If cart-service is unavailable, the order status remains reserved and the warning log shows the cleanup failure.
 
 These are useful next interview topics because they show how a basic working event flow becomes production-ready.
 
@@ -53,3 +74,4 @@ These are useful next interview topics because they show how a basic working eve
 - Consumers must be idempotent because Kafka can deliver messages more than once.
 - Event payloads should contain useful snapshots so consumers do not need extra synchronous calls.
 - The outbox pattern helps avoid the "database save succeeded but Kafka publish failed" problem.
+- Redis idempotency protects order placement from duplicate client retries.

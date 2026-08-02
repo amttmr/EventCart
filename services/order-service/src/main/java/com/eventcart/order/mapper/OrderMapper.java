@@ -50,6 +50,7 @@ public class OrderMapper {
                 order.getTotalAmount(),
                 order.getCurrency(),
                 order.getStatus(),
+                order.getStatusReason(),
                 order.getVersion(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
