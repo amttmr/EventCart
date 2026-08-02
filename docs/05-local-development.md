@@ -21,11 +21,22 @@ Implemented so far:
   - Request validation and global error handling.
 - `cart-service`
   - Customer cart lookup.
-  - Add item to cart.
+  - Add item to cart by product ID and quantity.
+  - Fetch product details from catalog-service before saving a cart snapshot.
   - Update item quantity.
   - Remove item from cart.
   - Clear cart.
   - MongoDB embedded cart item model.
+- `order-service`
+  - Place order from cart.
+  - Fetch cart details from cart-service.
+  - Store order snapshot in MongoDB.
+  - Publish `OrderCreatedEvent` to Kafka.
+- `inventory-service`
+  - Seed product stock for local testing.
+  - Consume `OrderCreatedEvent` from Kafka.
+  - Reserve stock when available.
+  - Publish `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
 - Docker Compose:
   - MongoDB
   - Kafka
@@ -79,6 +90,14 @@ docker compose down -v
 mvn clean verify
 ```
 
+If you changed a shared module such as `common-events` or `common-web`, install the reactor once before running a single service with Maven:
+
+```powershell
+mvn install -DskipTests
+```
+
+This updates your local Maven repository so `spring-boot:run` can see the latest shared classes.
+
 Build only the catalog service and required modules:
 
 ```powershell
@@ -89,6 +108,18 @@ Build only the cart service and required modules:
 
 ```powershell
 mvn -pl services/cart-service -am clean verify
+```
+
+Build only the order service and required modules:
+
+```powershell
+mvn -pl services/order-service -am clean verify
+```
+
+Build only the inventory service and required modules:
+
+```powershell
+mvn -pl services/inventory-service -am clean verify
 ```
 
 ## Run Catalog Service
@@ -118,6 +149,14 @@ http://localhost:8081/v3/api-docs
 
 ## Run Cart Service
 
+Start catalog-service first because cart-service calls it when adding items:
+
+```powershell
+mvn -pl services/catalog-service spring-boot:run
+```
+
+Then run cart-service in another terminal:
+
 ```powershell
 mvn -pl services/cart-service spring-boot:run
 ```
@@ -139,6 +178,60 @@ Swagger/OpenAPI documentation:
 ```text
 http://localhost:8082/swagger-ui.html
 http://localhost:8082/v3/api-docs
+```
+
+## Run Order Service
+
+Start cart-service first because order-service calls it when placing orders.
+
+```powershell
+mvn -pl services/order-service spring-boot:run
+```
+
+The service runs on:
+
+```text
+http://localhost:8083
+```
+
+Health endpoint:
+
+```text
+http://localhost:8083/actuator/health
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8083/swagger-ui.html
+http://localhost:8083/v3/api-docs
+```
+
+## Run Inventory Service
+
+Start Kafka through Docker Compose before starting inventory-service. Start inventory-service before placing an order if you want to watch the event get consumed immediately.
+
+```powershell
+mvn -pl services/inventory-service spring-boot:run
+```
+
+The service runs on:
+
+```text
+http://localhost:8084
+```
+
+Health endpoint:
+
+```text
+http://localhost:8084/actuator/health
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8084/swagger-ui.html
+http://localhost:8084/v3/api-docs
 ```
 
 ## Product API Examples
@@ -214,10 +307,6 @@ Add item to cart:
 ```powershell
 $body = @{
   productId = "<product-id>"
-  sku = "SKU-1001"
-  productName = "Mechanical Keyboard"
-  unitPrice = 6999.00
-  currency = "INR"
   quantity = 2
 } | ConvertTo-Json
 
@@ -226,6 +315,14 @@ Invoke-RestMethod -Method Post `
   -ContentType "application/json" `
   -Body $body
 ```
+
+When this request reaches cart-service, cart-service calls:
+
+```text
+GET http://localhost:8081/api/v1/products/<product-id>
+```
+
+Then it stores the product snapshot inside the `eventcart_cart.carts` MongoDB collection.
 
 Update item quantity:
 
@@ -252,6 +349,52 @@ Clear cart:
 Invoke-RestMethod -Method Delete "http://localhost:8082/api/v1/carts/customer-1"
 ```
 
+## Inventory API Examples
+
+Seed stock for the same product before placing an order:
+
+```powershell
+$body = @{
+  sku = "SKU-1001"
+  productName = "Mechanical Keyboard"
+  availableQuantity = 25
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Put `
+  -Uri "http://localhost:8084/api/v1/inventory/<product-id>" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Get inventory item:
+
+```powershell
+Invoke-RestMethod "http://localhost:8084/api/v1/inventory/<product-id>"
+```
+
+## Order API Examples
+
+Place order from the customer's cart:
+
+```powershell
+$body = @{
+  customerId = "customer-1"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8083/api/v1/orders" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+When order-service places the order, it publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result.
+
+Check reservation result by order ID:
+
+```powershell
+Invoke-RestMethod "http://localhost:8084/api/v1/inventory/reservations/<order-id>"
+```
+
 ## What This Teaches
 
 This first slice covers:
@@ -269,6 +412,11 @@ This first slice covers:
 - Docker Compose infrastructure.
 - OpenAPI and Swagger UI.
 - Embedded MongoDB document modeling for cart items.
+- Synchronous service-to-service communication with Spring RestClient.
+- Timeout handling and remote-service error mapping.
+- Kafka producer basics with `OrderCreatedEvent`.
+- Kafka consumer basics with inventory reservation.
+- Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
 
@@ -296,3 +444,9 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 7. What is the purpose of Docker Compose in local development?
 8. Why is a cart a good example for embedded MongoDB documents?
 9. What problem does OpenAPI solve for REST APIs?
+10. Why should cart-service fetch product details from catalog-service instead of trusting product price from the client?
+11. What are the trade-offs of synchronous service-to-service calls?
+12. Why does order-service store an order snapshot instead of reading from cart every time?
+13. What problem does Kafka solve between order-service and inventory-service?
+14. Why is idempotency important for Kafka consumers?
+15. What is the outbox pattern, and why will we need it later?

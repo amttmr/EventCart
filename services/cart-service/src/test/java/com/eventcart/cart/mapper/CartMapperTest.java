@@ -1,12 +1,13 @@
 package com.eventcart.cart.mapper;
 
+import com.eventcart.cart.client.CatalogProductResponse;
 import com.eventcart.cart.domain.CartDocument;
 import com.eventcart.cart.domain.CartItemDocument;
-import com.eventcart.cart.dto.AddCartItemRequest;
 import com.eventcart.cart.dto.CartResponse;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,24 +19,36 @@ class CartMapperTest {
     private final CartMapper cartMapper = new CartMapper();
 
     /**
-     * Verifies that add-item requests become embedded cart item documents.
+     * Verifies that catalog product responses become embedded cart item documents.
      */
     @Test
-    void toItemDocumentShouldMapAddRequest() {
-        AddCartItemRequest request = new AddCartItemRequest(
-                "product-1",
-                "SKU-1",
-                "Mechanical Keyboard",
-                new BigDecimal("6999.00"),
-                "inr",
-                2
-        );
+    void toItemDocumentShouldMapCatalogProduct() {
+        CatalogProductResponse product = product("product-1", "SKU-1", "Mechanical Keyboard", "inr");
 
-        CartItemDocument item = cartMapper.toItemDocument(request);
+        CartItemDocument item = cartMapper.toItemDocument(product, 2);
 
         assertThat(item.getProductId()).isEqualTo("product-1");
         assertThat(item.getCurrency()).isEqualTo("INR");
         assertThat(item.getQuantity()).isEqualTo(2);
+    }
+
+    /**
+     * Verifies that an existing cart item can refresh its snapshot from catalog data.
+     */
+    @Test
+    void refreshItemSnapshotShouldUpdateExistingItemDetails() {
+        CartItemDocument item = cartMapper.toItemDocument(
+                product("product-1", "SKU-OLD", "Old Keyboard", "INR"),
+                1
+        );
+        CatalogProductResponse updatedProduct = product("product-1", "SKU-NEW", "New Keyboard", "usd");
+
+        cartMapper.refreshItemSnapshot(item, updatedProduct);
+
+        assertThat(item.getSku()).isEqualTo("SKU-NEW");
+        assertThat(item.getProductName()).isEqualTo("New Keyboard");
+        assertThat(item.getCurrency()).isEqualTo("USD");
+        assertThat(item.getQuantity()).isEqualTo(1);
     }
 
     /**
@@ -62,5 +75,31 @@ class CartMapperTest {
         assertThat(response.subtotal()).isEqualByComparingTo("13998.00");
         assertThat(response.currency()).isEqualTo("INR");
     }
-}
 
+    /**
+     * Creates a catalog product response for mapper tests.
+     *
+     * @param productId product ID
+     * @param sku product SKU
+     * @param name product name
+     * @param currency currency code
+     * @return catalog product response
+     */
+    private CatalogProductResponse product(String productId, String sku, String name, String currency) {
+        return new CatalogProductResponse(
+                productId,
+                sku,
+                name,
+                "Test product",
+                "Electronics",
+                new BigDecimal("6999.00"),
+                currency,
+                10,
+                List.of("keyboard"),
+                true,
+                0L,
+                Instant.now(),
+                Instant.now()
+        );
+    }
+}

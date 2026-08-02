@@ -1,0 +1,64 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: inventory-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_inventory?authSource=admin
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: inventory-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.eventcart.common.events
+        spring.json.value.default.type: com.eventcart.common.events.OrderCreatedEvent
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: inventory-service
+    description: Inventory reservation service for EventCart
+
+logging:
+  level:
+    com.eventcart: INFO
+
+eventcart:
+  kafka:
+    topics:
+      order-created: eventcart.orders.created
+      inventory-reserved: eventcart.inventory.reserved
+      inventory-failed: eventcart.inventory.failed

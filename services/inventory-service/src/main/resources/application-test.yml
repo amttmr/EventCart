@@ -1,0 +1,17 @@
+spring:
+  mongodb:
+    uri: mongodb://localhost:27017/eventcart_inventory_test
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: inventory-service-test
+
+eventcart:
+  kafka:
+    topics:
+      order-created: eventcart.orders.created
+      inventory-reserved: eventcart.inventory.reserved
+      inventory-failed: eventcart.inventory.failed

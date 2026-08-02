@@ -31,6 +31,32 @@ public class CartExceptionHandler {
     }
 
     /**
+     * Handles products that catalog-service cannot provide for cart usage.
+     *
+     * @param ex product-not-available exception
+     * @param request current HTTP request
+     * @return standardized API error response
+     */
+    @ExceptionHandler(ProductNotAvailableException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiError handleProductNotAvailable(ProductNotAvailableException ex, HttpServletRequest request) {
+        return ApiError.of("PRODUCT_NOT_AVAILABLE", ex.getMessage(), request.getRequestURI());
+    }
+
+    /**
+     * Handles failures while calling catalog-service.
+     *
+     * @param ex catalog-service unavailable exception
+     * @param request current HTTP request
+     * @return standardized API error response
+     */
+    @ExceptionHandler(CatalogServiceUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public ApiError handleCatalogUnavailable(CatalogServiceUnavailableException ex, HttpServletRequest request) {
+        return ApiError.of("CATALOG_SERVICE_UNAVAILABLE", ex.getMessage(), request.getRequestURI());
+    }
+
+    /**
      * Handles request validation failures.
      *
      * @param ex validation exception raised by Spring MVC
@@ -80,4 +106,3 @@ public class CartExceptionHandler {
         return ApiError.of("INTERNAL_ERROR", "Unexpected server error", request.getRequestURI());
     }
 }
-

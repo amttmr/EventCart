@@ -4,18 +4,19 @@
 
 ## Responsibility
 
-This service stores a customer's active cart in MongoDB. It lets customers add product snapshots to their cart, update quantities, remove items, and clear the cart.
+This service stores a customer's active cart in MongoDB. It lets customers add products to their cart, update quantities, remove items, and clear the cart. When a product is added, the service calls catalog-service, fetches the latest product details, and stores a product snapshot inside the cart.
 
 ## Current Functionality
 
 | Feature | Description |
 | --- | --- |
 | Get cart | Returns the active cart for a customer, creating an empty cart if needed |
-| Add item | Adds a product snapshot to the cart or increases quantity if it already exists |
+| Add item | Accepts product ID and quantity, fetches product details from catalog-service, then stores a product snapshot |
 | Update quantity | Changes the quantity of an existing cart item |
 | Remove item | Removes one item from the cart |
 | Clear cart | Removes all items from the cart |
 | Totals | Calculates total quantity and subtotal |
+| Catalog lookup | Uses Spring RestClient to call catalog-service with timeout and error handling |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs
@@ -28,6 +29,19 @@ This service stores a customer's active cart in MongoDB. It lets customers add p
 | `DELETE` | `/api/v1/carts/{customerId}/items/{productId}` | Remove item |
 | `DELETE` | `/api/v1/carts/{customerId}` | Clear cart |
 
+## Add Item Request
+
+The client sends only the product ID and quantity:
+
+```json
+{
+  "productId": "6a6f2ff6c33ef72269887fec",
+  "quantity": 2
+}
+```
+
+cart-service fetches `sku`, name, price, currency, and active status from catalog-service before saving the cart item.
+
 ## Local URLs
 
 | Tool | URL |
@@ -39,5 +53,4 @@ This service stores a customer's active cart in MongoDB. It lets customers add p
 
 ## Interview Angle
 
-This service demonstrates service ownership, cart document modeling, embedded MongoDB documents, DTO validation, idempotent-ish add behavior, and separation between product catalog ownership and cart snapshots.
-
+This service demonstrates service ownership, cart document modeling, embedded MongoDB documents, DTO validation, idempotent-ish add behavior, synchronous service-to-service communication, timeout/error handling, and separation between product catalog ownership and cart snapshots.

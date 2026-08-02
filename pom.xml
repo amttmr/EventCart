@@ -24,6 +24,8 @@
         <module>common/common-test</module>
         <module>services/catalog-service</module>
         <module>services/cart-service</module>
+        <module>services/order-service</module>
+        <module>services/inventory-service</module>
     </modules>
 
     <properties>

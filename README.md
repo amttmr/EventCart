@@ -6,11 +6,11 @@ The goal is not only to build a working application, but also to understand the 
 
 ## Current Technology Baseline
 
-As of 2026-08-02, this project will target:
+As of 2026-08-02, this project currently builds with:
 
 | Area | Choice |
 | --- | --- |
-| Language | Java 25 LTS |
+| Language | Java 21, with an upgrade path to Java 25 after the local JDK is changed |
 | Backend framework | Spring Boot 4.1.x, Spring Framework 7.x |
 | Messaging | Apache Kafka 4.3.x |
 | Database | MongoDB 8.x |
@@ -32,6 +32,8 @@ Start here:
 5. [Documentation Standards](docs/04-documentation-standards.md)
 6. [Local Development](docs/05-local-development.md)
 7. [API Documentation](docs/06-api-documentation.md)
+8. [Service-to-Service Communication](docs/07-service-to-service-communication.md)
+9. [Event-Driven Order and Inventory Flow](docs/08-event-driven-order-inventory-flow.md)
 
 ## Planned Services
 
@@ -42,8 +44,8 @@ EventCart will be developed as a Maven multi-module project:
 | API Gateway | Single entry point for client APIs |
 | Catalog Service | Products, categories, search, inventory-facing product metadata |
 | Cart Service | Customer shopping cart |
-| Order Service | Order lifecycle and order state machine |
-| Inventory Service | Stock reservation and release |
+| Order Service | Order placement, order snapshots, and `OrderCreated` event publishing |
+| Inventory Service | Stock reservation and inventory reservation result events |
 | Payment Service | Payment simulation and payment events |
 | Notification Service | Email/SMS-style async notifications |
 | Common Libraries | Shared events, DTO conventions, exception models, test utilities |
@@ -51,10 +53,10 @@ EventCart will be developed as a Maven multi-module project:
 ## Core Business Flow
 
 1. Customer browses products.
-2. Customer adds products to cart.
-3. Customer places an order.
+2. Customer adds products to cart. Cart Service calls Catalog Service to fetch product details and stores a cart snapshot.
+3. Customer places an order. Order Service calls Cart Service and stores an order snapshot.
 4. Order Service publishes `OrderCreated`.
-5. Inventory Service reserves stock and publishes `InventoryReserved` or `InventoryReservationFailed`.
+5. Inventory Service consumes `OrderCreated`, reserves stock, and publishes `InventoryReserved` or `InventoryReservationFailed`.
 6. Payment Service processes payment and publishes `PaymentCompleted` or `PaymentFailed`.
 7. Order Service updates final order status.
 8. Notification Service sends customer updates asynchronously.

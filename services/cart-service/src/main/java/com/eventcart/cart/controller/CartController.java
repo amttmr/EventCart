@@ -53,16 +53,18 @@ public class CartController {
     }
 
     /**
-     * Adds a product snapshot to a customer's cart.
+     * Adds a product to a customer's cart.
      *
      * @param customerId customer ID
-     * @param request validated add-cart-item request
+     * @param request validated request containing product ID and quantity
      * @return updated cart response
      */
-    @Operation(summary = "Add item to cart", description = "Adds a product snapshot to the customer cart or increases quantity when the product already exists.")
+    @Operation(summary = "Add item to cart", description = "Adds a product to the customer cart. Cart-service fetches product details from catalog-service and stores a product snapshot.")
     @io.swagger.v3.oas.annotations.responses.ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Item added"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Validation failed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Product not available"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Catalog service unavailable")
     })
     @PostMapping("/{customerId}/items")
     public ApiResponse<CartResponse> addItem(
@@ -134,4 +136,3 @@ public class CartController {
         return ResponseEntity.noContent().build();
     }
 }
-

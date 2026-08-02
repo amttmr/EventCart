@@ -1,0 +1,59 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_order?authSource=admin
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: order-service
+    description: Order lifecycle service for EventCart
+
+logging:
+  level:
+    com.eventcart: INFO
+
+eventcart:
+  clients:
+    cart:
+      base-url: http://localhost:8082
+      connect-timeout: 2s
+      read-timeout: 3s
+  kafka:
+    topics:
+      order-created: eventcart.orders.created

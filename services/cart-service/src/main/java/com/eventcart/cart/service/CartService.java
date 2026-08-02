@@ -1,5 +1,7 @@
 package com.eventcart.cart.service;
 
+import com.eventcart.cart.client.CatalogClient;
+import com.eventcart.cart.client.CatalogProductResponse;
 import com.eventcart.cart.domain.CartDocument;
 import com.eventcart.cart.domain.CartItemDocument;
 import com.eventcart.cart.dto.AddCartItemRequest;
@@ -21,16 +23,19 @@ import java.util.stream.IntStream;
 public class CartService {
     private final CartRepository cartRepository;
     private final CartMapper cartMapper;
+    private final CatalogClient catalogClient;
 
     /**
      * Creates a cart service.
      *
      * @param cartRepository repository for cart persistence
      * @param cartMapper mapper between DTOs and documents
+     * @param catalogClient HTTP client for product data from catalog-service
      */
-    public CartService(CartRepository cartRepository, CartMapper cartMapper) {
+    public CartService(CartRepository cartRepository, CartMapper cartMapper, CatalogClient catalogClient) {
         this.cartRepository = cartRepository;
         this.cartMapper = cartMapper;
+        this.catalogClient = catalogClient;
     }
 
     /**
@@ -47,21 +52,25 @@ public class CartService {
      * Adds an item to the customer's cart.
      *
      * <p>If the same product already exists in the cart, this method increases
-     * the quantity instead of adding a duplicate item row.</p>
+     * the quantity instead of adding a duplicate item row. Product details are
+     * loaded from catalog-service so callers cannot inject product names or
+     * prices into the cart.</p>
      *
      * @param customerId customer ID
      * @param request validated add-cart-item request
      * @return updated cart response
      */
     public CartResponse addItem(String customerId, AddCartItemRequest request) {
+        CatalogProductResponse product = catalogClient.getProduct(request.productId());
         CartDocument cart = findOrCreateCart(customerId);
         Optional<CartItemDocument> existingItem = findItem(cart, request.productId());
 
         if (existingItem.isPresent()) {
             CartItemDocument item = existingItem.get();
+            cartMapper.refreshItemSnapshot(item, product);
             item.setQuantity(item.getQuantity() + request.quantity());
         } else {
-            cart.getItems().add(cartMapper.toItemDocument(request));
+            cart.getItems().add(cartMapper.toItemDocument(product, request.quantity()));
         }
 
         return cartMapper.toResponse(cartRepository.save(cart));
@@ -165,4 +174,3 @@ public class CartService {
                 .orElseThrow(() -> new CartItemNotFoundException("Product not found in cart: " + productId));
     }
 }
-

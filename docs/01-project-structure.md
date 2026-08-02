@@ -10,9 +10,9 @@ EventCart/
   pom.xml
   mvnw
   mvnw.cmd
+  compose.yaml
   .mvn/
   docker/
-    docker-compose.yml
     kafka/
     mongodb/
     keycloak/
@@ -24,6 +24,10 @@ EventCart/
     02-application-scope.md
     03-learning-and-interview-roadmap.md
     04-documentation-standards.md
+    05-local-development.md
+    06-api-documentation.md
+    07-service-to-service-communication.md
+    08-event-driven-order-inventory-flow.md
     api/
     architecture/
     decisions/
@@ -114,4 +118,3 @@ For learning and interview preparation, a monorepo is easier to manage because:
 - It is easier to explain service boundaries without managing many repositories.
 
 Later, we can discuss when teams split services into separate repositories.
-

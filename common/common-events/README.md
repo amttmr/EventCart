@@ -12,6 +12,11 @@ This module defines the structure of cross-service events. Event classes live he
 | --- | --- |
 | `EventMetadata` | Common metadata included in every domain event |
 | `ProductCreatedEvent` | Event contract for product creation in the catalog domain |
+| `OrderCreatedEvent` | Event contract published when an order is placed |
+| `OrderCreatedItem` | Product snapshot embedded in `OrderCreatedEvent` |
+| `InventoryReservedEvent` | Event contract published when stock is reserved |
+| `InventoryReservationFailedEvent` | Event contract published when stock cannot be reserved |
+| `InventoryReservedItem` | Reserved product quantity embedded in inventory events |
 
 ## Why This Module Exists
 
@@ -26,4 +31,3 @@ In an event-driven system, event contracts are part of the public API between se
 ## Interview Angle
 
 You should be able to explain that shared event contracts reduce accidental schema drift in a learning monorepo. In larger organizations, teams may publish event schemas through a schema registry instead of sharing Java classes directly.
-

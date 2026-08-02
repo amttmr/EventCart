@@ -1,8 +1,8 @@
 package com.eventcart.cart.mapper;
 
+import com.eventcart.cart.client.CatalogProductResponse;
 import com.eventcart.cart.domain.CartDocument;
 import com.eventcart.cart.domain.CartItemDocument;
-import com.eventcart.cart.dto.AddCartItemRequest;
 import com.eventcart.cart.dto.CartItemResponse;
 import com.eventcart.cart.dto.CartResponse;
 import org.springframework.stereotype.Component;
@@ -16,20 +16,34 @@ import java.util.List;
 @Component
 public class CartMapper {
     /**
-     * Converts an add-item request into an embedded cart item document.
+     * Converts a catalog product response into an embedded cart item document.
      *
-     * @param request validated add-cart-item request
+     * @param product product snapshot fetched from catalog-service
+     * @param quantity quantity requested by the customer
      * @return embedded cart item document
      */
-    public CartItemDocument toItemDocument(AddCartItemRequest request) {
+    public CartItemDocument toItemDocument(CatalogProductResponse product, int quantity) {
         CartItemDocument item = new CartItemDocument();
-        item.setProductId(request.productId());
-        item.setSku(request.sku());
-        item.setProductName(request.productName());
-        item.setUnitPrice(request.unitPrice());
-        item.setCurrency(request.currency().toUpperCase());
-        item.setQuantity(request.quantity());
+        item.setProductId(product.id());
+        item.setSku(product.sku());
+        item.setProductName(product.name());
+        item.setUnitPrice(product.price());
+        item.setCurrency(product.currency().toUpperCase());
+        item.setQuantity(quantity);
         return item;
+    }
+
+    /**
+     * Refreshes an existing cart item from the latest catalog product snapshot.
+     *
+     * @param item existing embedded cart item
+     * @param product latest product data from catalog-service
+     */
+    public void refreshItemSnapshot(CartItemDocument item, CatalogProductResponse product) {
+        item.setSku(product.sku());
+        item.setProductName(product.name());
+        item.setUnitPrice(product.price());
+        item.setCurrency(product.currency().toUpperCase());
     }
 
     /**
@@ -124,4 +138,3 @@ public class CartMapper {
         return item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
     }
 }
-

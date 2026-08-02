@@ -1,0 +1,18 @@
+spring:
+  mongodb:
+    uri: mongodb://localhost:27017/eventcart_order_test
+  data:
+    mongodb:
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: localhost:9092
+
+eventcart:
+  clients:
+    cart:
+      base-url: http://localhost:8082
+      connect-timeout: 2s
+      read-timeout: 3s
+  kafka:
+    topics:
+      order-created: eventcart.orders.created
