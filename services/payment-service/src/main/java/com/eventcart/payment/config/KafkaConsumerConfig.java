@@ -1,6 +1,7 @@
 package com.eventcart.payment.config;
 
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.kafka.KafkaDeadLetterSupport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +10,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
 import java.util.HashMap;
@@ -58,11 +61,30 @@ public class KafkaConsumerConfig {
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, InventoryReservedEvent> kafkaListenerContainerFactory(
-            ConsumerFactory<String, InventoryReservedEvent> consumerFactory
+            ConsumerFactory<String, InventoryReservedEvent> consumerFactory,
+            DefaultErrorHandler kafkaErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, InventoryReservedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(kafkaErrorHandler);
         return factory;
+    }
+
+    /**
+     * Creates the retry and dead-letter-topic handler used by payment consumers.
+     *
+     * @param kafkaTemplate Kafka template used by the recoverer to publish DLQ records
+     * @param retryIntervalMs delay between retry attempts
+     * @param maxRetryAttempts number of retries before DLQ publishing
+     * @return common Kafka error handler
+     */
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(
+            KafkaTemplate<String, Object> kafkaTemplate,
+            @Value("${eventcart.kafka.retry.interval-ms:1000}") long retryIntervalMs,
+            @Value("${eventcart.kafka.retry.max-attempts:3}") long maxRetryAttempts
+    ) {
+        return KafkaDeadLetterSupport.defaultErrorHandler(kafkaTemplate, retryIntervalMs, maxRetryAttempts);
     }
 }

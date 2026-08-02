@@ -28,11 +28,17 @@ public class KafkaProducerConfig {
      * Creates the Kafka admin client used by Spring Kafka to create declared topics.
      *
      * @param bootstrapServers Kafka bootstrap server list
+     * @param autoCreate whether Spring Kafka should create declared topics on startup
      * @return Kafka admin bean
      */
     @Bean
-    public KafkaAdmin kafkaAdmin(@Value("${spring.kafka.bootstrap-servers}") String bootstrapServers) {
-        return new KafkaAdmin(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers));
+    public KafkaAdmin kafkaAdmin(
+            @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
+            @Value("${spring.kafka.admin.auto-create:true}") boolean autoCreate
+    ) {
+        KafkaAdmin kafkaAdmin = new KafkaAdmin(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers));
+        kafkaAdmin.setAutoCreate(autoCreate);
+        return kafkaAdmin;
     }
 
     /**

@@ -56,7 +56,7 @@ This document defines what EventCart will do, who uses it, and how the main work
 - Simulate payment processing.
 - Support success and failure scenarios.
 - Publish payment events.
-- Demonstrate idempotent event consumption now; retries and dead-letter topics later.
+- Demonstrate idempotent event consumption, retries, and dead-letter topics.
 
 ### Notification
 
@@ -73,24 +73,24 @@ This document defines what EventCart will do, who uses it, and how the main work
 4. Customer adds items to cart.
 5. Customer places order.
 6. Order Service creates order with `CREATED` status.
-7. Kafka receives `OrderCreatedEvent`.
-8. Inventory Service consumes the event and reserves stock.
-9. Payment Service processes payment after stock reservation.
-10. Order Service updates order status from later events.
-11. Notification Service sends order updates.
-12. Customer checks order status.
+7. Order Service stores `OrderCreatedEvent` in the outbox.
+8. Kafka receives `OrderCreatedEvent`.
+9. Inventory Service consumes the event and reserves stock.
+10. Payment Service processes payment after stock reservation.
+11. Order Service updates order status from later events.
+12. Notification Service stores order updates.
+13. Customer checks order status.
 
 ## Kafka Topics
 
 | Topic | Producer | Consumers |
 | --- | --- | --- |
-| `eventcart.orders.created` | Order Service | Inventory Service |
+| `eventcart.orders.created` | Order Service outbox publisher | Inventory Service, Notification Service |
 | `eventcart.inventory.reserved` | Inventory Service | Order Service, Payment Service |
-| `eventcart.inventory.failed` | Inventory Service | Order Service, future Notification Service |
-| `eventcart.payments.completed` | Payment Service | Order Service, future Notification Service |
-| `eventcart.payments.failed` | Payment Service | Order Service, Inventory Service, future Notification Service |
-| `notification.events` | Multiple services | Notification Service |
-| `dead-letter.events` | Error handlers | Developers/Admin diagnostics |
+| `eventcart.inventory.failed` | Inventory Service | Order Service, Notification Service |
+| `eventcart.payments.completed` | Payment Service | Order Service, Notification Service |
+| `eventcart.payments.failed` | Payment Service | Order Service, Inventory Service, Notification Service |
+| `<topic>.dlq` | Error handlers | Developers/Admin diagnostics |
 
 ## MongoDB Collections
 
@@ -99,8 +99,8 @@ This document defines what EventCart will do, who uses it, and how the main work
 | Catalog Service | `products`, `categories` |
 | Cart Service | `carts` |
 | Order Service | `orders`, `order_audit_logs`, `outbox_events` |
-| Inventory Service | `inventory_items`, `stock_reservations` |
-| Payment Service | `payments`, `payment_attempts` |
+| Inventory Service | `inventory_items`, `inventory_reservations` |
+| Payment Service | `payment_attempts` |
 | Notification Service | `notifications` |
 
 ## How The Finished Application Will Be Used
@@ -147,7 +147,9 @@ http://localhost:8083/swagger-ui.html
 | 8 | Add Payment Service and payment event flow |
 | 9 | Add Notification Service |
 | 10 | Add security with Keycloak and JWT |
-| 11 | Add integration tests with Testcontainers |
-| 12 | Add observability with Actuator, Prometheus, Grafana, OpenTelemetry |
-| 13 | Add Kubernetes manifests |
-| 14 | Prepare interview notes and architecture explanation |
+| 11 | Add Kafka retry and DLQ handling |
+| 12 | Add order-service outbox |
+| 13 | Add integration tests with Testcontainers |
+| 14 | Add observability with Actuator, Prometheus, and Micrometer tracing |
+| 15 | Add Kubernetes manifests |
+| 16 | Prepare interview notes and architecture explanation |

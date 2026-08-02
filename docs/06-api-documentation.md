@@ -21,6 +21,8 @@ OpenAPI gives us:
 | Order Service | `http://localhost:8083/swagger-ui.html` | `http://localhost:8083/v3/api-docs` |
 | Inventory Service | `http://localhost:8084/swagger-ui.html` | `http://localhost:8084/v3/api-docs` |
 | Payment Service | `http://localhost:8085/swagger-ui.html` | `http://localhost:8085/v3/api-docs` |
+| Notification Service | `http://localhost:8086/swagger-ui.html` | `http://localhost:8086/v3/api-docs` |
+| API Gateway | `http://localhost:8080/swagger-ui.html` | `http://localhost:8080/v3/api-docs` |
 
 ## Catalog APIs
 
@@ -72,7 +74,7 @@ Place order request:
 
 `idempotencyKey` is optional, but recommended. It lets a frontend or API client retry the same order request without accidentally creating a duplicate order.
 
-After the order is created, order-service returns the order with status `CREATED`. inventory-service processes the Kafka event asynchronously, payment-service reacts after inventory is reserved, and order-service updates the order to `INVENTORY_RESERVED`, `INVENTORY_FAILED`, `PAYMENT_COMPLETED`, or `PAYMENT_FAILED`.
+After the order is created, order-service returns the order with status `CREATED`. The order-created event is stored in the outbox and then published asynchronously. inventory-service processes the Kafka event, payment-service reacts after inventory is reserved, notification-service records customer notifications, and order-service updates the order to `INVENTORY_RESERVED`, `INVENTORY_FAILED`, `PAYMENT_COMPLETED`, or `PAYMENT_FAILED`.
 
 ## Inventory APIs
 
@@ -107,6 +109,28 @@ curl http://localhost:8085/api/v1/payments/orders/<order-id>
 ```
 
 payment-service creates the payment attempt asynchronously after it consumes `InventoryReservedEvent`.
+
+## Notification APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/notifications/customers/{customerId}` | List notifications for a customer |
+| `GET` | `/api/v1/notifications/{notificationId}` | Fetch one notification |
+| `PUT` | `/api/v1/notifications/{notificationId}/read` | Mark a notification as read |
+
+notification-service creates these records asynchronously from Kafka events.
+
+## API Gateway And Security
+
+The gateway runs on port `8080` and forwards the same `/api/v1/**` paths to the correct backend service.
+
+Use the gateway for security testing because it validates Keycloak JWT tokens and applies role-based access rules:
+
+| Role | Example access |
+| --- | --- |
+| `ADMIN` | Product and inventory management |
+| `CUSTOMER` | Cart, order, and notification APIs |
+| `SUPPORT` | Order, payment, and notification lookup |
 
 ## Run Services Locally
 
@@ -146,6 +170,18 @@ Run payment-service in another terminal:
 .\mvnw.cmd -pl services/payment-service spring-boot:run
 ```
 
+Run notification-service in another terminal:
+
+```powershell
+.\mvnw.cmd -pl services/notification-service spring-boot:run
+```
+
+Run api-gateway in another terminal:
+
+```powershell
+.\mvnw.cmd -pl services/api-gateway spring-boot:run
+```
+
 ## Interview Notes
 
 You should be able to explain:
@@ -159,3 +195,4 @@ You should be able to explain:
 - API documentation should show service boundaries clearly. In this flow, clients do not send product price to cart-service.
 - OpenAPI examples should demonstrate operationally safer requests, such as order placement with an `idempotencyKey`.
 - Some APIs are lookup-only because their data is created asynchronously from Kafka events, such as payment attempts.
+- Gateway security shows role checks at the edge, while backend services still validate JWTs for direct-port access.

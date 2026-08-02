@@ -1,9 +1,11 @@
 package com.eventcart.payment.event;
 
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.payment.service.PaymentService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -32,8 +34,13 @@ public class InventoryReservedListener {
      */
     @KafkaListener(topics = "${eventcart.kafka.topics.inventory-reserved}", groupId = "${spring.kafka.consumer.group-id}")
     public void handle(InventoryReservedEvent event) {
-        log.info("Consumed InventoryReserved event orderId={} eventId={} amount={} currency={}",
-                event.orderId(), event.metadata().eventId(), event.totalAmount(), event.currency());
-        paymentService.processInventoryReserved(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed InventoryReserved event orderId={} eventId={} amount={} currency={}",
+                    event.orderId(), event.metadata().eventId(), event.totalAmount(), event.currency());
+            paymentService.processInventoryReserved(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 }

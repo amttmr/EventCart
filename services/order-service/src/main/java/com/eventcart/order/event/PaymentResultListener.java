@@ -2,9 +2,11 @@ package com.eventcart.order.event;
 
 import com.eventcart.common.events.PaymentCompletedEvent;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.order.service.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -37,9 +39,14 @@ public class PaymentResultListener {
             containerFactory = "paymentCompletedKafkaListenerContainerFactory"
     )
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
-        log.info("Consumed PaymentCompleted event eventId={} orderId={} paymentId={}",
-                event.metadata().eventId(), event.orderId(), event.paymentId());
-        orderService.markPaymentCompleted(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed PaymentCompleted event eventId={} orderId={} paymentId={}",
+                    event.metadata().eventId(), event.orderId(), event.paymentId());
+            orderService.markPaymentCompleted(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 
     /**
@@ -53,8 +60,13 @@ public class PaymentResultListener {
             containerFactory = "paymentFailedKafkaListenerContainerFactory"
     )
     public void handlePaymentFailed(PaymentFailedEvent event) {
-        log.info("Consumed PaymentFailed event eventId={} orderId={} paymentId={} reason={}",
-                event.metadata().eventId(), event.orderId(), event.paymentId(), event.reason());
-        orderService.markPaymentFailed(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed PaymentFailed event eventId={} orderId={} paymentId={} reason={}",
+                    event.metadata().eventId(), event.orderId(), event.paymentId(), event.reason());
+            orderService.markPaymentFailed(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 }

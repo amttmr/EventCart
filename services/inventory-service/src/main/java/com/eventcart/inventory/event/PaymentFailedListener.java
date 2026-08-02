@@ -1,9 +1,11 @@
 package com.eventcart.inventory.event;
 
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.inventory.service.InventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -36,8 +38,13 @@ public class PaymentFailedListener {
             containerFactory = "paymentFailedKafkaListenerContainerFactory"
     )
     public void handle(PaymentFailedEvent event) {
-        log.info("Consumed PaymentFailed event orderId={} paymentId={} eventId={} reason={}",
-                event.orderId(), event.paymentId(), event.metadata().eventId(), event.reason());
-        inventoryService.releaseReservationAfterPaymentFailure(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed PaymentFailed event orderId={} paymentId={} eventId={} reason={}",
+                    event.orderId(), event.paymentId(), event.metadata().eventId(), event.reason());
+            inventoryService.releaseReservationAfterPaymentFailure(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 }

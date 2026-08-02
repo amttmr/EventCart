@@ -37,33 +37,34 @@ Start here:
 10. [Logging and Debugging](docs/09-logging-and-debugging.md)
 11. [QA and New Joiner Application Flow Guide](docs/10-qa-application-flow.md)
 
-## Planned Services
+## Current Services
 
-EventCart will be developed as a Maven multi-module project:
+EventCart is developed as a Maven multi-module project:
 
 | Service | Responsibility |
 | --- | --- |
-| API Gateway | Single entry point for client APIs |
+| API Gateway | Single entry point for client APIs, routing, JWT validation, and RBAC |
 | Catalog Service | Products, categories, search, inventory-facing product metadata |
 | Cart Service | Customer shopping cart |
-| Order Service | Order placement, order snapshots, Redis idempotency, and inventory/payment-driven status updates |
+| Order Service | Order placement, order snapshots, Redis idempotency, outbox event publishing, and inventory/payment-driven status updates |
 | Inventory Service | Stock reservation and inventory reservation result events |
 | Payment Service | Payment simulation and payment events |
-| Notification Service | Email/SMS-style async notifications |
-| Common Libraries | Shared events, DTO conventions, exception models, test utilities |
+| Notification Service | Async in-app notifications from order and payment events |
+| Common Libraries | Shared events, DTO conventions, exception models, security, Kafka retry/DLQ support, and test utilities |
 
 ## Core Business Flow
 
 1. Customer browses products.
 2. Customer adds products to cart. Cart Service calls Catalog Service to fetch product details and stores a cart snapshot.
 3. Customer places an order. Order Service calls Cart Service and stores an order snapshot.
-4. Order Service publishes `OrderCreated`.
-5. Inventory Service consumes `OrderCreated`, reserves stock, and publishes `InventoryReserved` or `InventoryReservationFailed`.
-6. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
-7. Payment Service consumes `InventoryReserved`, simulates payment, and publishes `PaymentCompleted` or `PaymentFailed`.
-8. Order Service consumes payment result events and updates final payment/order status.
-9. Inventory Service consumes failed payment events and releases reserved stock.
-10. Notification Service sends customer updates asynchronously.
+4. Order Service stores `OrderCreatedEvent` in the MongoDB outbox.
+5. Order Service outbox scheduler publishes `OrderCreatedEvent` to Kafka.
+6. Inventory Service consumes `OrderCreated`, reserves stock, and publishes `InventoryReserved` or `InventoryReservationFailed`.
+7. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
+8. Payment Service consumes `InventoryReserved`, simulates payment, and publishes `PaymentCompleted` or `PaymentFailed`.
+9. Order Service consumes payment result events and updates final payment/order status.
+10. Inventory Service consumes failed payment events and releases reserved stock.
+11. Notification Service stores customer notifications asynchronously from order and payment events.
 
 ## Learning Promise
 

@@ -10,11 +10,11 @@ import com.eventcart.order.domain.OrderDocument;
 import com.eventcart.order.domain.OrderStatus;
 import com.eventcart.order.dto.OrderResponse;
 import com.eventcart.order.dto.PlaceOrderRequest;
-import com.eventcart.order.event.OrderEventPublisher;
 import com.eventcart.order.exception.CartServiceUnavailableException;
 import com.eventcart.order.exception.EmptyCartException;
 import com.eventcart.order.exception.OrderNotFoundException;
 import com.eventcart.order.mapper.OrderMapper;
+import com.eventcart.order.outbox.OrderOutboxService;
 import com.eventcart.order.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +33,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartClient cartClient;
     private final OrderMapper orderMapper;
-    private final OrderEventPublisher orderEventPublisher;
+    private final OrderOutboxService orderOutboxService;
     private final OrderIdempotencyService orderIdempotencyService;
 
     /**
@@ -42,20 +42,20 @@ public class OrderService {
      * @param orderRepository repository for order persistence
      * @param cartClient HTTP client for cart-service
      * @param orderMapper mapper between cart data, order documents, DTOs, and events
-     * @param orderEventPublisher Kafka publisher for order events
+     * @param orderOutboxService outbox service used to enqueue order events
      * @param orderIdempotencyService Redis-backed idempotency helper
      */
     public OrderService(
             OrderRepository orderRepository,
             CartClient cartClient,
             OrderMapper orderMapper,
-            OrderEventPublisher orderEventPublisher,
+            OrderOutboxService orderOutboxService,
             OrderIdempotencyService orderIdempotencyService
     ) {
         this.orderRepository = orderRepository;
         this.cartClient = cartClient;
         this.orderMapper = orderMapper;
-        this.orderEventPublisher = orderEventPublisher;
+        this.orderOutboxService = orderOutboxService;
         this.orderIdempotencyService = orderIdempotencyService;
     }
 
@@ -89,7 +89,7 @@ public class OrderService {
             orderIdempotencyService.complete(request.idempotencyKey(), savedOrder.getId());
             log.info("Order saved orderId={} customerId={} itemCount={} totalAmount={}",
                     savedOrder.getId(), savedOrder.getCustomerId(), savedOrder.getItems().size(), savedOrder.getTotalAmount());
-            orderEventPublisher.publishOrderCreated(orderMapper.toOrderCreatedEvent(savedOrder));
+            orderOutboxService.enqueueOrderCreated(orderMapper.toOrderCreatedEvent(savedOrder));
             return orderMapper.toResponse(savedOrder);
         } catch (RuntimeException ex) {
             orderIdempotencyService.clearIfInProgress(request.idempotencyKey());

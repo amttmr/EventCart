@@ -3,6 +3,7 @@ package com.eventcart.payment.mapper;
 import com.eventcart.common.events.EventMetadata;
 import com.eventcart.common.events.PaymentCompletedEvent;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.payment.domain.PaymentAttemptDocument;
 import com.eventcart.payment.dto.PaymentAttemptResponse;
 import org.springframework.stereotype.Component;
@@ -43,7 +44,11 @@ public class PaymentMapper {
      */
     public PaymentCompletedEvent toPaymentCompletedEvent(PaymentAttemptDocument attempt) {
         return new PaymentCompletedEvent(
-                EventMetadata.create(PaymentCompletedEvent.EVENT_TYPE, PaymentCompletedEvent.VERSION, attempt.getOrderId()),
+                EventMetadata.create(
+                        PaymentCompletedEvent.EVENT_TYPE,
+                        PaymentCompletedEvent.VERSION,
+                        CorrelationIdContext.getCorrelationIdOr(attempt.getOrderId())
+                ),
                 attempt.getId(),
                 attempt.getOrderId(),
                 attempt.getCustomerId(),
@@ -61,7 +66,11 @@ public class PaymentMapper {
      */
     public PaymentFailedEvent toPaymentFailedEvent(PaymentAttemptDocument attempt) {
         return new PaymentFailedEvent(
-                EventMetadata.create(PaymentFailedEvent.EVENT_TYPE, PaymentFailedEvent.VERSION, attempt.getOrderId()),
+                EventMetadata.create(
+                        PaymentFailedEvent.EVENT_TYPE,
+                        PaymentFailedEvent.VERSION,
+                        CorrelationIdContext.getCorrelationIdOr(attempt.getOrderId())
+                ),
                 attempt.getId(),
                 attempt.getOrderId(),
                 attempt.getCustomerId(),

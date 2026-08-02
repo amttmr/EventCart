@@ -9,6 +9,12 @@ spring:
   data:
     mongodb:
       auto-index-creation: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8088/realms/eventcart
+          jwk-set-uri: http://localhost:8088/realms/eventcart/protocol/openid-connect/certs
 
 springdoc:
   api-docs:
@@ -31,6 +37,9 @@ management:
   info:
     env:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
 
 info:
   app:
@@ -38,10 +47,14 @@ info:
     description: Shopping cart service for EventCart
 
 logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
     com.eventcart: INFO
 
 eventcart:
+  security:
+    enabled: true
   clients:
     catalog:
       base-url: http://localhost:8081

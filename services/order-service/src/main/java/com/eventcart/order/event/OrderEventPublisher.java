@@ -3,9 +3,12 @@ package com.eventcart.order.event;
 import com.eventcart.common.events.OrderCreatedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Publishes order domain events to Kafka.
@@ -36,20 +39,19 @@ public class OrderEventPublisher {
      *
      * @param event event payload to publish
      */
-    public void publishOrderCreated(OrderCreatedEvent event) {
+    public CompletableFuture<SendResult<String, Object>> publishOrderCreated(OrderCreatedEvent event) {
         log.info("Publishing OrderCreated event orderId={} eventId={} topic={}",
                 event.orderId(), event.metadata().eventId(), orderCreatedTopic);
         var future = kafkaTemplate.send(orderCreatedTopic, event.orderId(), event);
-        if (future != null) {
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish OrderCreated event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), orderCreatedTopic, ex);
-                } else {
-                    log.debug("Published OrderCreated event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), orderCreatedTopic);
-                }
-            });
-        }
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to publish OrderCreated event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), orderCreatedTopic, ex);
+            } else {
+                log.debug("Published OrderCreated event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), orderCreatedTopic);
+            }
+        });
+        return future;
     }
 }

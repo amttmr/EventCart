@@ -5,6 +5,7 @@ import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
 import com.eventcart.common.events.InventoryReservedItem;
 import com.eventcart.common.events.OrderCreatedItem;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.inventory.domain.InventoryItemDocument;
 import com.eventcart.inventory.domain.InventoryReservationDocument;
 import com.eventcart.inventory.domain.InventoryReservationItemDocument;
@@ -91,7 +92,11 @@ public class InventoryMapper {
      */
     public InventoryReservedEvent toInventoryReservedEvent(InventoryReservationDocument reservation) {
         return new InventoryReservedEvent(
-                EventMetadata.create(InventoryReservedEvent.EVENT_TYPE, InventoryReservedEvent.VERSION, reservation.getOrderId()),
+                EventMetadata.create(
+                        InventoryReservedEvent.EVENT_TYPE,
+                        InventoryReservedEvent.VERSION,
+                        CorrelationIdContext.getCorrelationIdOr(reservation.getOrderId())
+                ),
                 reservation.getOrderId(),
                 reservation.getCustomerId(),
                 reservation.getItems().stream().map(this::toInventoryReservedItem).toList(),
@@ -111,7 +116,7 @@ public class InventoryMapper {
                 EventMetadata.create(
                         InventoryReservationFailedEvent.EVENT_TYPE,
                         InventoryReservationFailedEvent.VERSION,
-                        reservation.getOrderId()
+                        CorrelationIdContext.getCorrelationIdOr(reservation.getOrderId())
                 ),
                 reservation.getOrderId(),
                 reservation.getCustomerId(),

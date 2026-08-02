@@ -3,6 +3,7 @@ package com.eventcart.order;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Bootstrap class for the EventCart order service.
@@ -12,6 +13,7 @@ import org.springframework.kafka.annotation.EnableKafka;
  */
 @SpringBootApplication(scanBasePackages = "com.eventcart")
 @EnableKafka
+@EnableScheduling
 public class OrderServiceApplication {
     /**
      * Starts the order service Spring Boot application.

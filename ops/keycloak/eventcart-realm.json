@@ -1,0 +1,99 @@
+{
+  "realm": "eventcart",
+  "enabled": true,
+  "displayName": "EventCart",
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Can manage products, inventory, and operational data"
+      },
+      {
+        "name": "CUSTOMER",
+        "description": "Can use shopping cart, order, and notification APIs"
+      },
+      {
+        "name": "SUPPORT",
+        "description": "Can inspect orders, payments, and notifications"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "eventcart-gateway",
+      "name": "EventCart Gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8080/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080",
+        "http://localhost:8081",
+        "http://localhost:8082",
+        "http://localhost:8083",
+        "http://localhost:8084",
+        "http://localhost:8085",
+        "http://localhost:8086"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "EventCart",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ADMIN"
+      ]
+    },
+    {
+      "username": "customer-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "EventCart",
+      "lastName": "Customer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "CUSTOMER"
+      ]
+    },
+    {
+      "username": "support-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "EventCart",
+      "lastName": "Support",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "support",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "SUPPORT"
+      ]
+    }
+  ]
+}

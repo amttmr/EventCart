@@ -1,5 +1,6 @@
 package com.eventcart.inventory.config;
 
+import com.eventcart.common.kafka.KafkaDeadLetterSupport;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -37,5 +38,27 @@ public class KafkaTopicConfig {
                 .partitions(3)
                 .replicas(1)
                 .build();
+    }
+
+    /**
+     * Declares the DLQ for failed order-created processing.
+     *
+     * @param topicName order-created topic
+     * @return Kafka dead-letter topic definition
+     */
+    @Bean
+    public NewTopic orderCreatedDeadLetterTopic(@Value("${eventcart.kafka.topics.order-created}") String topicName) {
+        return KafkaDeadLetterSupport.deadLetterTopic(topicName);
+    }
+
+    /**
+     * Declares the DLQ for failed payment-failed compensation processing.
+     *
+     * @param topicName payment-failed topic
+     * @return Kafka dead-letter topic definition
+     */
+    @Bean
+    public NewTopic paymentFailedDeadLetterTopic(@Value("${eventcart.kafka.topics.payment-failed}") String topicName) {
+        return KafkaDeadLetterSupport.deadLetterTopic(topicName);
     }
 }

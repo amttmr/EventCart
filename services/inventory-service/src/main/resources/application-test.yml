@@ -10,7 +10,12 @@ spring:
       group-id: inventory-service-test
 
 eventcart:
+  security:
+    enabled: false
   kafka:
+    retry:
+      interval-ms: 10
+      max-attempts: 1
     topics:
       order-created: eventcart.orders.created
       inventory-reserved: eventcart.inventory.reserved

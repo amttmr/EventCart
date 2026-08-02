@@ -2,6 +2,7 @@ package com.eventcart.inventory.config;
 
 import com.eventcart.common.events.OrderCreatedEvent;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.kafka.KafkaDeadLetterSupport;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -11,6 +12,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
 import java.util.HashMap;
@@ -59,11 +62,13 @@ public class KafkaConsumerConfig {
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> kafkaListenerContainerFactory(
-            @Qualifier("orderCreatedConsumerFactory") ConsumerFactory<String, OrderCreatedEvent> consumerFactory
+            @Qualifier("orderCreatedConsumerFactory") ConsumerFactory<String, OrderCreatedEvent> consumerFactory,
+            DefaultErrorHandler kafkaErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(kafkaErrorHandler);
         return factory;
     }
 
@@ -106,11 +111,30 @@ public class KafkaConsumerConfig {
      */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedKafkaListenerContainerFactory(
-            @Qualifier("paymentFailedConsumerFactory") ConsumerFactory<String, PaymentFailedEvent> consumerFactory
+            @Qualifier("paymentFailedConsumerFactory") ConsumerFactory<String, PaymentFailedEvent> consumerFactory,
+            DefaultErrorHandler kafkaErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(kafkaErrorHandler);
         return factory;
+    }
+
+    /**
+     * Creates the retry and dead-letter-topic handler used by inventory consumers.
+     *
+     * @param kafkaTemplate Kafka template used by the recoverer to publish DLQ records
+     * @param retryIntervalMs delay between retry attempts
+     * @param maxRetryAttempts number of retries before DLQ publishing
+     * @return common Kafka error handler
+     */
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(
+            KafkaTemplate<String, Object> kafkaTemplate,
+            @Value("${eventcart.kafka.retry.interval-ms:1000}") long retryIntervalMs,
+            @Value("${eventcart.kafka.retry.max-attempts:3}") long maxRetryAttempts
+    ) {
+        return KafkaDeadLetterSupport.defaultErrorHandler(kafkaTemplate, retryIntervalMs, maxRetryAttempts);
     }
 }

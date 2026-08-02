@@ -3,6 +3,7 @@ package com.eventcart.order.mapper;
 import com.eventcart.common.events.EventMetadata;
 import com.eventcart.common.events.OrderCreatedEvent;
 import com.eventcart.common.events.OrderCreatedItem;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.order.client.CartItemResponse;
 import com.eventcart.order.client.CartResponse;
 import com.eventcart.order.domain.OrderDocument;
@@ -65,7 +66,11 @@ public class OrderMapper {
      */
     public OrderCreatedEvent toOrderCreatedEvent(OrderDocument order) {
         return new OrderCreatedEvent(
-                EventMetadata.create(OrderCreatedEvent.EVENT_TYPE, OrderCreatedEvent.VERSION, order.getId()),
+                EventMetadata.create(
+                        OrderCreatedEvent.EVENT_TYPE,
+                        OrderCreatedEvent.VERSION,
+                        CorrelationIdContext.getCorrelationIdOr(order.getId())
+                ),
                 order.getId(),
                 order.getCustomerId(),
                 order.getItems().stream().map(this::toOrderCreatedItem).toList(),

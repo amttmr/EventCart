@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8088/realms/eventcart
+          jwk-set-uri: http://localhost:8088/realms/eventcart/protocol/openid-connect/certs
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+
+info:
+  app:
+    name: api-gateway
+    description: Single entry point and security gateway for EventCart
+
+logging:
+  level:
+    com.eventcart: INFO
+    org.springframework.cloud.gateway: INFO
+
+eventcart:
+  gateway:
+    services:
+      catalog-service-url: http://localhost:8081
+      cart-service-url: http://localhost:8082
+      order-service-url: http://localhost:8083
+      inventory-service-url: http://localhost:8084
+      payment-service-url: http://localhost:8085
+      notification-service-url: http://localhost:8086

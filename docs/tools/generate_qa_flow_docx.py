@@ -182,7 +182,7 @@ def add_title_block(doc: Document) -> None:
     set_table_width(meta, [1900, CONTENT_WIDTH_DXA - 1900])
     rows = (
         ("Project", "EventCart real-time e-commerce order platform"),
-        ("Current scope", "Catalog, cart, order, inventory, Redis idempotency, Kafka order status flow"),
+        ("Current scope", "Gateway, JWT security, catalog, cart, order, outbox, inventory, payment, notification, DLQ, observability"),
         ("Last updated", "2026-08-02"),
     )
     for row_index, (label, value) in enumerate(rows):

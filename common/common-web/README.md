@@ -13,6 +13,8 @@ This module keeps common API response shapes consistent across services.
 | `ApiResponse` | Standard success response wrapper |
 | `ApiError` | Standard error response model |
 | `PageResponse` | Stable pagination response model built from Spring Data `Page` |
+| `EventCartJsonConfiguration` | Shared fallback Jackson `ObjectMapper` used by services and outbox serialization |
+| `CorrelationIdFilter` | Reads or creates `X-Correlation-Id` and places it in logs for request tracing |
 
 ## Why This Module Exists
 
@@ -21,4 +23,3 @@ Without a shared web model, each service can accidentally return different respo
 ## Interview Angle
 
 You should be able to explain why DTOs and response wrappers are useful, and also when they can become unnecessary ceremony. For EventCart, consistency is helpful because many services expose REST APIs.
-

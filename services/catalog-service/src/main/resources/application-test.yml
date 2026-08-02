@@ -6,3 +6,7 @@ spring:
       auto-index-creation: true
   kafka:
     bootstrap-servers: localhost:9092
+
+eventcart:
+  security:
+    enabled: false

@@ -1,5 +1,6 @@
 package com.eventcart.payment.config;
 
+import com.eventcart.common.kafka.KafkaDeadLetterSupport;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -37,5 +38,16 @@ public class KafkaTopicConfig {
                 .partitions(3)
                 .replicas(1)
                 .build();
+    }
+
+    /**
+     * Declares the DLQ for failed inventory-reserved processing.
+     *
+     * @param topicName inventory-reserved topic
+     * @return Kafka dead-letter topic definition
+     */
+    @Bean
+    public NewTopic inventoryReservedDeadLetterTopic(@Value("${eventcart.kafka.topics.inventory-reserved}") String topicName) {
+        return KafkaDeadLetterSupport.deadLetterTopic(topicName);
     }
 }

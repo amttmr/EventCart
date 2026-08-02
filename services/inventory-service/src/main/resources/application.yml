@@ -9,6 +9,12 @@ spring:
   data:
     mongodb:
       auto-index-creation: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8088/realms/eventcart
+          jwk-set-uri: http://localhost:8088/realms/eventcart/protocol/openid-connect/certs
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
@@ -46,6 +52,9 @@ management:
   info:
     env:
       enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
 
 info:
   app:
@@ -53,11 +62,18 @@ info:
     description: Inventory reservation service for EventCart
 
 logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
     com.eventcart: INFO
 
 eventcart:
+  security:
+    enabled: true
   kafka:
+    retry:
+      interval-ms: 1000
+      max-attempts: 3
     topics:
       order-created: eventcart.orders.created
       inventory-reserved: eventcart.inventory.reserved

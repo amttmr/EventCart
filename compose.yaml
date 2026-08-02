@@ -73,8 +73,25 @@ services:
       timeout: 5s
       retries: 10
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    container_name: eventcart-keycloak
+    restart: unless-stopped
+    ports:
+      - "8088:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    command: [ "start-dev", "--import-realm" ]
+    volumes:
+      - ./ops/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin >/dev/null 2>&1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
 volumes:
   mongodb_data:
   kafka_data:
   redis_data:
-

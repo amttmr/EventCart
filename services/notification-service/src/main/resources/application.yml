@@ -1,0 +1,76 @@
+server:
+  port: 8086
+
+spring:
+  application:
+    name: notification-service
+  mongodb:
+    uri: mongodb://eventcart:eventcart@localhost:27017/eventcart_notification?authSource=admin
+  data:
+    mongodb:
+      auto-index-creation: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8088/realms/eventcart
+          jwk-set-uri: http://localhost:8088/realms/eventcart/protocol/openid-connect/certs
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  info:
+    env:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+
+info:
+  app:
+    name: notification-service
+    description: Customer notification service for EventCart
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
+  level:
+    com.eventcart: INFO
+
+eventcart:
+  security:
+    enabled: true
+  kafka:
+    retry:
+      interval-ms: 1000
+      max-attempts: 3
+    topics:
+      order-created: eventcart.orders.created
+      inventory-failed: eventcart.inventory.failed
+      payment-completed: eventcart.payments.completed
+      payment-failed: eventcart.payments.failed

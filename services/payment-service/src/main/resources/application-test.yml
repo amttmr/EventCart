@@ -10,11 +10,16 @@ spring:
       group-id: payment-service-test
 
 eventcart:
+  security:
+    enabled: false
   payment:
     simulation:
       provider-name: MockPay
       failure-amount-threshold: 50000.00
   kafka:
+    retry:
+      interval-ms: 10
+      max-attempts: 1
     topics:
       inventory-reserved: eventcart.inventory.reserved
       payment-completed: eventcart.payments.completed

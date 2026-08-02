@@ -13,5 +13,15 @@
 
     <artifactId>common-test</artifactId>
     <name>common-test</name>
-</project>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-mongodb</artifactId>
+        </dependency>
+    </dependencies>
+</project>

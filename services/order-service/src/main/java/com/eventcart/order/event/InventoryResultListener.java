@@ -2,9 +2,11 @@ package com.eventcart.order.event;
 
 import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.order.service.OrderService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -37,9 +39,14 @@ public class InventoryResultListener {
             containerFactory = "inventoryReservedKafkaListenerContainerFactory"
     )
     public void handleInventoryReserved(InventoryReservedEvent event) {
-        log.info("Consumed InventoryReserved event eventId={} orderId={} customerId={}",
-                event.metadata().eventId(), event.orderId(), event.customerId());
-        orderService.markInventoryReserved(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed InventoryReserved event eventId={} orderId={} customerId={}",
+                    event.metadata().eventId(), event.orderId(), event.customerId());
+            orderService.markInventoryReserved(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 
     /**
@@ -53,8 +60,13 @@ public class InventoryResultListener {
             containerFactory = "inventoryFailedKafkaListenerContainerFactory"
     )
     public void handleInventoryFailed(InventoryReservationFailedEvent event) {
-        log.info("Consumed InventoryReservationFailed event eventId={} orderId={} customerId={} reason={}",
-                event.metadata().eventId(), event.orderId(), event.customerId(), event.reason());
-        orderService.markInventoryFailed(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed InventoryReservationFailed event eventId={} orderId={} customerId={} reason={}",
+                    event.metadata().eventId(), event.orderId(), event.customerId(), event.reason());
+            orderService.markInventoryFailed(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 }

@@ -8,6 +8,8 @@ Each service currently uses:
 
 ```yaml
 logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{correlationId:-}]"
   level:
     com.eventcart: INFO
 ```
@@ -32,7 +34,8 @@ logging:
 | --- | --- |
 | Create product | `Creating product`, `Product created` |
 | Add to cart | `Adding cart item`, `Calling catalog-service`, `Cart item added` |
-| Place order | `Placing order`, `Order idempotency key reserved`, `Cart fetched for order`, `Order saved`, `Publishing OrderCreated event` |
+| Place order | `Placing order`, `Order idempotency key reserved`, `Cart fetched for order`, `Order saved` |
+| Outbox publishing | `OrderCreated event stored in outbox`, `Outbox event published`, `Publishing OrderCreated event` |
 | Inventory reservation | `Consumed OrderCreated event`, `Reserving inventory`, `Inventory reserved` |
 | Failed inventory | `Reservation stock check failed`, `Inventory reservation failed`, `Publishing InventoryReservationFailed event` |
 | Order status update | `Consumed InventoryReserved event`, `Order status updated after inventory reservation`, `Cart clear completed` |
@@ -40,6 +43,41 @@ logging:
 | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
 | Final order payment update | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
 | Inventory compensation | `Consumed PaymentFailed event`, `Releasing inventory after payment failure`, `Inventory released after payment failure` |
+| Notification projection | `Consumed OrderCreated event for notification`, `Notification stored`, `Notification marked read` |
+| Gateway routing/security | Gateway route logs, `401 Unauthorized`, `403 Forbidden`, and `X-Correlation-Id` response headers |
+
+## Debug Correlation IDs
+
+Every HTTP response includes `X-Correlation-Id`. If the request does not provide one, the gateway or backend service creates one.
+
+Pass a known ID while debugging:
+
+```bash
+curl http://localhost:8080/api/v1/products \
+  -H "X-Correlation-Id: qa-flow-001"
+```
+
+Expected behavior:
+
+- The response contains `X-Correlation-Id: qa-flow-001`.
+- Backend logs include the same ID in the log level pattern.
+- Kafka event metadata carries the same correlation ID.
+
+## Debug Kafka DLQs
+
+If a listener fails after configured retries, the record is published to `<topic>.dlq`.
+
+List DLQ topics:
+
+```powershell
+docker exec -it eventcart-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list | Select-String ".dlq"
+```
+
+Read one DLQ:
+
+```powershell
+docker exec -it eventcart-kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic eventcart.orders.created.dlq --from-beginning --max-messages 5
+```
 
 ## Debug Redis Idempotency
 

@@ -1,9 +1,11 @@
 package com.eventcart.inventory.event;
 
 import com.eventcart.common.events.OrderCreatedEvent;
+import com.eventcart.common.web.observability.CorrelationIdContext;
 import com.eventcart.inventory.service.InventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -32,8 +34,13 @@ public class OrderCreatedListener {
      */
     @KafkaListener(topics = "${eventcart.kafka.topics.order-created}", groupId = "${spring.kafka.consumer.group-id}")
     public void handle(OrderCreatedEvent event) {
-        log.info("Consumed OrderCreated event orderId={} eventId={} itemCount={}",
-                event.orderId(), event.metadata().eventId(), event.items().size());
-        inventoryService.reserveInventory(event);
+        MDC.put(CorrelationIdContext.MDC_KEY, event.metadata().correlationId());
+        try {
+            log.info("Consumed OrderCreated event orderId={} eventId={} itemCount={}",
+                    event.orderId(), event.metadata().eventId(), event.items().size());
+            inventoryService.reserveInventory(event);
+        } finally {
+            MDC.remove(CorrelationIdContext.MDC_KEY);
+        }
     }
 }

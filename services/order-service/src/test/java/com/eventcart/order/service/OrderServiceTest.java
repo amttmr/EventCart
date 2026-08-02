@@ -13,8 +13,8 @@ import com.eventcart.order.domain.OrderDocument;
 import com.eventcart.order.domain.OrderStatus;
 import com.eventcart.order.dto.OrderResponse;
 import com.eventcart.order.dto.PlaceOrderRequest;
-import com.eventcart.order.event.OrderEventPublisher;
 import com.eventcart.order.mapper.OrderMapper;
+import com.eventcart.order.outbox.OrderOutboxService;
 import com.eventcart.order.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
 
@@ -37,19 +37,19 @@ class OrderServiceTest {
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final CartClient cartClient = mock(CartClient.class);
     private final OrderMapper orderMapper = new OrderMapper();
-    private final OrderEventPublisher orderEventPublisher = mock(OrderEventPublisher.class);
+    private final OrderOutboxService orderOutboxService = mock(OrderOutboxService.class);
     private final OrderIdempotencyService orderIdempotencyService = mock(OrderIdempotencyService.class);
     private final OrderService orderService = new OrderService(
             orderRepository,
             cartClient,
             orderMapper,
-            orderEventPublisher,
+            orderOutboxService,
             orderIdempotencyService
     );
 
     /**
      * Verifies that placing an order fetches the cart, saves an order snapshot,
-     * and publishes the order-created event.
+     * and enqueues the order-created event in the outbox.
      */
     @Test
     void placeOrderShouldCreateOrderAndPublishEvent() {
@@ -69,7 +69,7 @@ class OrderServiceTest {
         verify(cartClient).getCart("customer-1");
         verify(orderRepository).save(any(OrderDocument.class));
         verify(orderIdempotencyService).complete(null, "order-1");
-        verify(orderEventPublisher).publishOrderCreated(any());
+        verify(orderOutboxService).enqueueOrderCreated(any());
     }
 
     /**
@@ -87,7 +87,7 @@ class OrderServiceTest {
         assertThat(response.status()).isEqualTo(OrderStatus.CREATED);
         verify(cartClient, never()).getCart("customer-1");
         verify(orderRepository, never()).save(any(OrderDocument.class));
-        verify(orderEventPublisher, never()).publishOrderCreated(any());
+        verify(orderOutboxService, never()).enqueueOrderCreated(any());
     }
 
     /**

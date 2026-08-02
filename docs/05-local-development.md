@@ -32,7 +32,8 @@ Implemented so far:
   - Fetch cart details from cart-service.
   - Store order snapshot in MongoDB.
   - Use Redis idempotency keys for safe order-placement retries.
-  - Publish `OrderCreatedEvent` to Kafka.
+  - Store `OrderCreatedEvent` in the outbox.
+  - Publish pending outbox events to Kafka.
   - Consume inventory reservation result events.
   - Update order status to `INVENTORY_RESERVED` or `INVENTORY_FAILED`.
   - Consume payment result events.
@@ -50,10 +51,17 @@ Implemented so far:
   - Simulate payment success or failure.
   - Store payment attempts in MongoDB.
   - Publish `PaymentCompletedEvent` or `PaymentFailedEvent`.
+- `notification-service`
+  - Consume order, inventory failure, and payment result events from Kafka.
+  - Store customer notification history in MongoDB.
+- `api-gateway`
+  - Route `/api/v1/**` traffic to backend services.
+  - Validate Keycloak JWT tokens and enforce roles.
 - Docker Compose:
   - MongoDB
   - Kafka
   - Redis for order idempotency keys
+  - Keycloak
 - OpenAPI/Swagger UI for service APIs.
 
 ## Important Java Note
@@ -139,6 +147,18 @@ Build only the payment service and required modules:
 
 ```powershell
 mvn -pl services/payment-service -am clean verify
+```
+
+Build only the notification service and required modules:
+
+```powershell
+mvn -pl services/notification-service -am clean verify
+```
+
+Build only the API Gateway and required modules:
+
+```powershell
+mvn -pl services/api-gateway -am clean verify
 ```
 
 ## Run Catalog Service
@@ -278,6 +298,83 @@ Swagger/OpenAPI documentation:
 ```text
 http://localhost:8085/swagger-ui.html
 http://localhost:8085/v3/api-docs
+```
+
+## Run Notification Service
+
+Start Kafka through Docker Compose before starting notification-service.
+
+```powershell
+mvn -pl services/notification-service spring-boot:run
+```
+
+The service runs on:
+
+```text
+http://localhost:8086
+```
+
+Swagger/OpenAPI documentation:
+
+```text
+http://localhost:8086/swagger-ui.html
+http://localhost:8086/v3/api-docs
+```
+
+## Run API Gateway
+
+Start Keycloak through Docker Compose before testing secured gateway APIs.
+
+```powershell
+mvn -pl services/api-gateway spring-boot:run
+```
+
+The gateway runs on:
+
+```text
+http://localhost:8080
+```
+
+Use gateway paths such as:
+
+```text
+http://localhost:8080/api/v1/products
+http://localhost:8080/api/v1/carts/customer-1
+http://localhost:8080/api/v1/orders/customer/customer-1
+```
+
+## Get A Local Keycloak Token
+
+Keycloak imports realm `eventcart` from `ops/keycloak/eventcart-realm.json`.
+
+Admin token:
+
+```powershell
+$tokenResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8088/realms/eventcart/protocol/openid-connect/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "grant_type=password&client_id=eventcart-gateway&username=admin-user&password=admin"
+
+$adminToken = $tokenResponse.access_token
+```
+
+Customer token:
+
+```powershell
+$tokenResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8088/realms/eventcart/protocol/openid-connect/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "grant_type=password&client_id=eventcart-gateway&username=customer-user&password=customer"
+
+$customerToken = $tokenResponse.access_token
+```
+
+Call a secured gateway API:
+
+```powershell
+Invoke-RestMethod `
+  -Uri "http://localhost:8080/api/v1/carts/customer-1" `
+  -Headers @{ Authorization = "Bearer $customerToken" }
 ```
 
 ## Product API Examples
@@ -434,7 +531,7 @@ Invoke-RestMethod -Method Post `
   -Body $body
 ```
 
-When order-service places the order, it stores an idempotency key in Redis and publishes `OrderCreatedEvent` to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result. payment-service consumes successful inventory reservations and creates a payment attempt.
+When order-service places the order, it stores an idempotency key in Redis and stores `OrderCreatedEvent` in MongoDB collection `outbox_events`. The outbox publisher sends the pending event to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result. payment-service consumes successful inventory reservations and creates a payment attempt.
 
 Check order status by order ID:
 
@@ -483,10 +580,15 @@ This first slice covers:
 - Timeout handling and remote-service error mapping.
 - Redis idempotency for safe order-placement retries.
 - Kafka producer basics with `OrderCreatedEvent`.
+- Transactional outbox basics with order-service `outbox_events`.
 - Kafka consumer basics with inventory reservation.
 - Kafka consumer basics with order status updates from inventory result events.
 - Kafka event chaining with payment simulation after inventory reservation.
+- Kafka retry and DLQ behavior with `<topic>.dlq`.
 - Compensating actions by releasing reserved inventory after payment failure.
+- JWT resource server basics with Keycloak.
+- API Gateway routing and edge authorization.
+- Correlation IDs, actuator metrics, Prometheus, and tracing basics.
 - Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
@@ -520,9 +622,12 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 12. Why does order-service store an order snapshot instead of reading from cart every time?
 13. What problem does Kafka solve between order-service and inventory-service?
 14. Why is idempotency important for Kafka consumers?
-15. What is the outbox pattern, and why will we need it later?
+15. What is the outbox pattern, and why does order-service use it before publishing Kafka events?
 16. How does Redis-based idempotency protect order creation from duplicate client retries?
 17. Why do we clear the cart after inventory reservation instead of immediately after order creation?
 18. Why does payment-service consume `InventoryReservedEvent` instead of `OrderCreatedEvent`?
 19. How does payment-service handle duplicate Kafka messages?
 20. Why does inventory-service need to release stock when payment fails?
+21. Why should API Gateway authorization not be the only security layer?
+22. How do retry and DLQ handling help Kafka consumers?
+23. What does `X-Correlation-Id` solve in a microservices flow?

@@ -59,6 +59,8 @@ EventCart/
 | `common-events` | Shared Kafka event contracts and event metadata |
 | `common-web` | Shared API response models, exception handling helpers, correlation ID support |
 | `common-test` | Testcontainers setup, test data builders, reusable integration test utilities |
+| `common-security` | Shared JWT resource server and Keycloak role mapping for backend services |
+| `common-kafka` | Shared Kafka retry and dead-letter-topic helper |
 | `api-gateway` | External API entry point, routing, security enforcement, request correlation |
 | `catalog-service` | Product catalog, product search, categories, product availability view |
 | `cart-service` | Customer cart operations |
