@@ -156,3 +156,27 @@ Interview topics:
 - Explain why MongoDB was used.
 - Explain how failures are handled.
 - Explain how you would scale the system.
+
+## Phase 9: React Frontend
+
+What we build:
+
+- React and TypeScript single-page application.
+- Vite local dev workflow.
+- Keycloak login from the browser.
+- Protected routes by role.
+- API Gateway calls with bearer token and correlation ID.
+- React Query server state for products, carts, orders, payments, inventory, and notifications.
+- Zustand workflow state for active customer, selected product, and last order.
+- React Hook Form and Zod validated forms.
+
+Interview topics:
+
+- React component composition.
+- Props, state, context, and effects.
+- Client state vs server state.
+- React Router protected routes.
+- JWT authentication in a SPA.
+- React Query caching, invalidation, polling, and retries.
+- Form validation and why backend validation is still required.
+- How frontend polling fits an eventually consistent Kafka workflow.

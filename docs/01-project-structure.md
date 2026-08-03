@@ -46,6 +46,8 @@ EventCart/
     inventory-service/
     payment-service/
     notification-service/
+  frontend/
+    eventcart-ui/
   e2e-tests/
   ops/
     docker/
@@ -75,6 +77,7 @@ EventCart/
 | `inventory-service` | Stock management, reservation, release, inventory outbox events |
 | `payment-service` | Payment simulation, payment status, payment outbox events |
 | `notification-service` | Async customer notifications, notification history, optional email/SMS delivery |
+| `frontend/eventcart-ui` | React UI for catalog browsing, cart management, order tracking, inventory setup, notifications, and interview-oriented frontend learning |
 | `e2e-tests` | Docker-backed end-to-end tests that launch service jars and exercise the full platform flow |
 
 ## Standard Service Layout

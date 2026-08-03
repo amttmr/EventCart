@@ -10,13 +10,14 @@ Use this document when you need to:
 
 - Understand the current end-to-end business flow.
 - Execute the APIs in the correct order.
+- Execute the same flow through the React UI.
 - Verify where data is stored after each step.
 - Debug common local issues such as empty carts, missing stock, duplicate order retries, authorization failures, DLQ messages, and Kafka processing delays.
 - Onboard a new team member to the current service boundaries.
 
 ## Current Scope
 
-The current working slice covers API Gateway routing, Keycloak JWT security, customer ownership checks, product catalog, cart, order placement, transactional outbox publishing in order/inventory/payment services, inventory reservation, payment simulation, notification history, optional email/SMS delivery, Redis idempotency, Kafka retry/DLQ handling, observability, Docker/CI/Kubernetes packaging, and Kafka-based order status updates.
+The current working slice covers React UI, API Gateway routing, Keycloak JWT security, customer ownership checks, product catalog, cart, order placement, transactional outbox publishing in order/inventory/payment services, inventory reservation, payment simulation, notification history, optional email/SMS delivery, Redis idempotency, Kafka retry/DLQ handling, observability, Docker/CI/Kubernetes packaging, and Kafka-based order status updates.
 
 | Area | Current state |
 | --- | --- |
@@ -36,6 +37,7 @@ The current working slice covers API Gateway routing, Keycloak JWT security, cus
 | Deployment | Dockerfiles, GitHub Actions workflow, Kubernetes manifests, and secret templates |
 | E2E tests | Docker-backed test launches service jars and verifies order-to-notification flow |
 | OpenAPI | Swagger UI available for all implemented services |
+| React UI | Browser console for catalog, cart, order tracking, notification review, and admin setup |
 
 ## Services And Local Ports
 
@@ -48,6 +50,7 @@ The current working slice covers API Gateway routing, Keycloak JWT security, cus
 | payment-service | 8085 | Owns mock payment attempts | MongoDB `eventcart_payment.payment_attempts` |
 | notification-service | 8086 | Owns customer notifications | MongoDB `eventcart_notification.notifications` |
 | api-gateway | 8080 | Single secured entry point | Routes to backend services |
+| eventcart-ui | 5173 | React local development console | Calls API Gateway through Vite proxy |
 | MongoDB | 27017 | Local document database | Docker container `eventcart-mongodb` |
 | Kafka | 9092 | Local event broker | Docker container `eventcart-kafka` |
 | Redis | 6379 | Local cache/key-value store | Docker container `eventcart-redis` |
@@ -138,6 +141,31 @@ Start services in separate terminals, in this order:
 ```
 
 The startup order matters for manual testing because cart-service calls catalog-service, order-service calls cart-service, api-gateway routes to every backend service, and inventory/order/payment/notification communicate through Kafka.
+
+Start the React UI after the gateway is running:
+
+```powershell
+cd C:\Users\HP\Documents\Study\EventCart\frontend\eventcart-ui
+npm.cmd install
+npm.cmd run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+Recommended UI smoke path:
+
+1. Sign in as `admin-user/admin`.
+2. Create a product from Admin.
+3. Seed inventory from Admin.
+4. Sign in as `customer-user/customer`.
+5. Add the product from Catalog to Cart.
+6. Place the order from Cart.
+7. Track the order in Orders.
+8. Verify notifications in Notifications.
 
 For an automated platform smoke test with Docker-backed MongoDB, Kafka, and Redis:
 
@@ -939,6 +967,7 @@ Update this guide whenever any of the following changes:
 - Service startup order, port, or local infrastructure changes.
 - Security rules, ownership checks, or internal service-token behavior changes.
 - Notification provider configuration or contact resolution changes.
+- React route, screen, form, authentication, or UI smoke flow changes.
 - Observability, Docker, CI/CD, Kubernetes, or secret handling changes.
 - New services such as payment-service, notification-service, gateway, or security are added.
 

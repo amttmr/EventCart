@@ -14,6 +14,18 @@ This document explains the responsibility boundary for each EventCart service. T
 
 The gateway routes `/api/v1/**` requests to the correct backend service. It is useful for clients because they do not need to know every service port.
 
+## React UI
+
+| Area | Details |
+| --- | --- |
+| Module | `frontend/eventcart-ui` |
+| Port | `5173` in local development |
+| Main responsibility | Browser console for the customer shopping and admin setup flows. |
+| Security | Uses Keycloak JS to sign in and sends bearer tokens to the API Gateway. |
+| Data ownership | Owns no business database; reads and mutates backend state through APIs. |
+
+The React UI provides dashboard, catalog, cart, order tracking, notification, and admin screens. It uses React Query for server state, Zustand for small workflow state, React Router for routes, and React Hook Form/Zod for validated forms.
+
 ## Catalog Service
 
 | Area | Details |

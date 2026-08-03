@@ -20,6 +20,7 @@ As of 2026-08-03, this project currently builds with:
 | Observability | Spring Boot Actuator, Micrometer, Prometheus, Grafana, OpenTelemetry |
 | Deployment | Docker, Docker Compose, Kubernetes-ready manifests |
 | Documentation | Markdown docs, OpenAPI/Swagger |
+| Frontend | React, TypeScript, Vite, React Router, React Query, Zustand, React Hook Form, Zod |
 
 ## Documentation Index
 
@@ -40,6 +41,7 @@ Start here:
 13. [Architecture Documentation](docs/architecture/README.md)
 14. [Architecture Decision Records](docs/decisions/README.md)
 15. [Interview Preparation](docs/interview/README.md)
+16. [Frontend UI](frontend/eventcart-ui/README.md)
 
 ## Current Services
 
@@ -54,13 +56,14 @@ EventCart is developed as a Maven multi-module project:
 | Inventory Service | Stock reservation, compensation, and outbox-backed inventory result events |
 | Payment Service | Payment simulation and outbox-backed payment events |
 | Notification Service | Async notification history plus optional email/SMS delivery from order and payment events |
+| React UI | Browser-based operations console for catalog, cart, orders, inventory setup, and notifications |
 | Common Libraries | Shared events, DTO conventions, exception models, security, Kafka retry/DLQ support, and test utilities |
 | E2E Tests | Docker-backed full-platform tests that launch service jars and verify the order-to-notification flow |
 
 ## Core Business Flow
 
 1. Customer browses products.
-2. Customer adds products to cart. Cart Service calls Catalog Service to fetch product details and stores a cart snapshot.
+2. Customer adds products to cart through the React UI or API. Cart Service calls Catalog Service to fetch product details and stores a cart snapshot.
 3. Customer places an order. Order Service calls Cart Service and stores an order snapshot.
 4. Order Service stores `OrderCreatedEvent` in the MongoDB outbox.
 5. Order Service outbox scheduler publishes `OrderCreatedEvent` to Kafka.
@@ -85,4 +88,5 @@ By the end of this project, you should be able to:
 - Test services using Testcontainers.
 - Write a full-platform E2E test that launches multiple services against Docker-backed infrastructure.
 - Run the full stack locally with Docker Compose.
+- Build a React UI that authenticates with Keycloak and calls the API Gateway.
 - Discuss the project confidently in Java backend and microservices interviews.

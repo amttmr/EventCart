@@ -74,6 +74,7 @@ Implemented so far:
 - OpenAPI/Swagger UI for service APIs.
 - Dockerfiles, GitHub Actions CI/CD workflow, Kubernetes manifests, and secret templates.
 - Docker-backed end-to-end tests in `e2e-tests`.
+- React UI in `frontend/eventcart-ui` for catalog browsing, cart management, order tracking, inventory setup, and notifications.
 
 ## Important Java Note
 
@@ -91,6 +92,17 @@ Java version: 25.x
 ```
 
 The root `pom.xml` uses `<java.version>25</java.version>` and `maven.compiler.release` points to that value, so compiling the project requires a JDK 25 toolchain.
+
+## Important Node.js Note
+
+The React UI uses Vite and TypeScript. Confirm Node.js is available:
+
+```powershell
+node --version
+npm.cmd --version
+```
+
+Use `npm.cmd` on Windows PowerShell if plain `npm` is blocked by execution policy.
 
 ## Start Infrastructure
 
@@ -390,6 +402,39 @@ http://localhost:8080/api/v1/carts/customer-1
 http://localhost:8080/api/v1/orders/customer/customer-1
 ```
 
+## Run React UI
+
+Start Docker infrastructure, backend services, Keycloak, and API Gateway first. Then run:
+
+```powershell
+cd C:\Users\HP\Documents\Study\EventCart\frontend\eventcart-ui
+npm.cmd install
+npm.cmd run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+The UI calls `/api/v1/**`. Vite proxies those requests to `http://localhost:8080`, so all browser traffic still goes through the API Gateway.
+
+Local users:
+
+| User | Password | Main UI usage |
+| --- | --- | --- |
+| `admin-user` | `admin` | Create products and seed inventory |
+| `customer-user` | `customer` | Add cart items, place orders, read notifications |
+| `support-user` | `support` | Inspect order/payment/notification data |
+
+If Keycloak was already running before React redirect URLs were added, recreate the Keycloak container:
+
+```powershell
+docker compose rm -sf keycloak
+docker compose up -d keycloak
+```
+
 ## Get A Local Keycloak Token
 
 Keycloak imports realm `eventcart` from `ops/keycloak/eventcart-realm.json`.
@@ -666,6 +711,7 @@ This first slice covers:
 - Docker image creation, CI/CD workflow basics, Kubernetes manifests, and production-grade secret references.
 - Full platform E2E testing with Testcontainers and bootable service jars.
 - Event-driven workflow and eventual consistency.
+- React SPA development with routing, protected routes, Keycloak login, React Query server state, Zustand workflow state, and form validation.
 
 ## Spring Boot 4 MongoDB Configuration Note
 
@@ -711,3 +757,6 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 25. Why should real secrets come from environment variables, CI/CD secret stores, or Kubernetes Secret integrations instead of source code?
 26. What do Prometheus, Grafana, and OpenTelemetry each contribute to observability?
 27. What does a full platform E2E test catch that a unit test or mocked integration test cannot catch?
+28. Why should the browser call the API Gateway instead of individual microservices?
+29. What is the difference between React Query server state and Zustand client state?
+30. How does frontend polling make Kafka eventual consistency visible to the user?

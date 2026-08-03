@@ -1,6 +1,6 @@
 # System Overview
 
-EventCart is a microservices-based real-time e-commerce order platform. It is designed for learning modern Java backend development with Spring Boot, MongoDB, Kafka, Redis, Keycloak, observability tooling, Docker, CI/CD, and Kubernetes-ready deployment.
+EventCart is a microservices-based real-time e-commerce order platform. It is designed for learning modern full-stack development with React, TypeScript, Spring Boot, MongoDB, Kafka, Redis, Keycloak, observability tooling, Docker, CI/CD, and Kubernetes-ready deployment.
 
 ## Main Goal
 
@@ -18,7 +18,7 @@ The system models the customer shopping flow:
 
 ```mermaid
 flowchart LR
-    Client["Client or API Tester"]
+    Client["React UI or API Tester"]
     Gateway["API Gateway<br/>localhost:8080"]
 
     Catalog["catalog-service<br/>Products"]
@@ -35,6 +35,7 @@ flowchart LR
     Observability["Actuator, Prometheus,<br/>Grafana, OpenTelemetry"]
 
     Client --> Gateway
+    Client --> Keycloak
     Gateway --> Catalog
     Gateway --> Cart
     Gateway --> Order
@@ -80,6 +81,7 @@ flowchart LR
 
 | Service | Local Port | Responsibility |
 | --- | --- | --- |
+| React UI | `5173` | Browser console for catalog, cart, orders, inventory setup, and notifications. |
 | API Gateway | `8080` | Single client entry point and edge JWT authorization. |
 | Catalog Service | `8081` | Product catalog and product metadata. |
 | Cart Service | `8082` | Customer cart and product snapshot in cart. |
@@ -119,13 +121,15 @@ EventCart intentionally uses both synchronous and asynchronous communication:
 
 | Communication | Used Where | Why |
 | --- | --- | --- |
+| Browser HTTP | React UI to API Gateway | The frontend uses one external API entry point. |
 | Synchronous HTTP | Cart to Catalog, Order to Cart | The caller needs immediate data to complete the current user request. |
 | Kafka events | Order to Inventory to Payment to Notification | The workflow can continue asynchronously and each service can own its own state. |
 | Redis command access | Order idempotency | Order placement retry checks must be fast and atomic. |
 
 ## Important Design Ideas
 
-- API Gateway is the single external entry point.
+- React UI calls the API Gateway instead of individual microservice ports.
+- API Gateway is the single backend entry point for browser/API clients.
 - Backend services also validate JWTs so security is not only at the edge.
 - Customer-owned resources are checked against the JWT `customer_id` claim.
 - MongoDB documents store snapshots to preserve order and cart history.
