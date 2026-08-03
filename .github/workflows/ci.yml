@@ -12,8 +12,8 @@ permissions:
   packages: write
 
 env:
-  JAVA_BUILD_IMAGE: eclipse-temurin:21-jdk
-  JAVA_RUNTIME_IMAGE: eclipse-temurin:21-jre
+  JAVA_BUILD_IMAGE: eclipse-temurin:25-jdk
+  JAVA_RUNTIME_IMAGE: eclipse-temurin:25-jre
   DOCKER_PULL_ATTEMPTS: "4"
   DOCKER_BUILD_ATTEMPTS: "3"
 
@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "21"
+          java-version: "25"
           cache: maven
 
       - name: Prepare Maven wrapper

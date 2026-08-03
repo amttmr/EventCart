@@ -14,7 +14,7 @@ Current jobs:
 
 | Job | Purpose |
 | --- | --- |
-| `build-test` | Checks out code, sets up Java 21, runs unit tests, runs integration tests. |
+| `build-test` | Checks out code, sets up Java 25, runs unit tests, runs integration tests. |
 | `docker-build` | Builds Docker images for each service after tests pass. |
 | `docker-publish` | Publishes tagged Docker images to GHCR for version tags. |
 
@@ -51,7 +51,7 @@ Java setup:
 uses: actions/setup-java@v4
 with:
   distribution: temurin
-  java-version: "21"
+  java-version: "25"
   cache: maven
 ```
 
@@ -147,8 +147,8 @@ bash .github/scripts/docker-build-service.sh catalog-service eventcart/catalog-s
 Override Java base images if a registry mirror or hardened internal image is required:
 
 ```powershell
-$env:JAVA_BUILD_IMAGE = "eclipse-temurin:21-jdk"
-$env:JAVA_RUNTIME_IMAGE = "eclipse-temurin:21-jre"
+$env:JAVA_BUILD_IMAGE = "eclipse-temurin:25-jdk"
+$env:JAVA_RUNTIME_IMAGE = "eclipse-temurin:25-jre"
 bash .github/scripts/docker-build-service.sh inventory-service eventcart/inventory-service:local
 ```
 

@@ -11,8 +11,8 @@ if [[ ! -f "${dockerfile}" ]]; then
   exit 1
 fi
 
-java_build_image="${JAVA_BUILD_IMAGE:-eclipse-temurin:21-jdk}"
-java_runtime_image="${JAVA_RUNTIME_IMAGE:-eclipse-temurin:21-jre}"
+java_build_image="${JAVA_BUILD_IMAGE:-eclipse-temurin:25-jdk}"
+java_runtime_image="${JAVA_RUNTIME_IMAGE:-eclipse-temurin:25-jre}"
 pull_attempts="${DOCKER_PULL_ATTEMPTS:-4}"
 build_attempts="${DOCKER_BUILD_ATTEMPTS:-3}"
 

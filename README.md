@@ -10,7 +10,7 @@ As of 2026-08-03, this project currently builds with:
 
 | Area | Choice |
 | --- | --- |
-| Language | Java 21, with an upgrade path to Java 25 after the local JDK is changed |
+| Language | Java 25 |
 | Backend framework | Spring Boot 4.1.x, Spring Framework 7.x |
 | Messaging | Apache Kafka 4.3.x |
 | Database | MongoDB 8.x |

@@ -1,5 +1,5 @@
-ARG JAVA_BUILD_IMAGE=eclipse-temurin:21-jdk
-ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:21-jre
+ARG JAVA_BUILD_IMAGE=eclipse-temurin:25-jdk
+ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:25-jre
 
 FROM ${JAVA_BUILD_IMAGE} AS build
 WORKDIR /workspace

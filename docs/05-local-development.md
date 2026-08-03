@@ -77,17 +77,20 @@ Implemented so far:
 
 ## Important Java Note
 
-The project currently targets Java 21 because your active terminal reports:
+The project targets Java 25. Before building or running services, confirm that both `java` and Maven use JDK 25:
+
+```powershell
+java -version
+.\mvnw.cmd -version
+```
+
+Expected result:
 
 ```text
-java 21.0.8
+Java version: 25.x
 ```
 
-After Java 25 is active in `JAVA_HOME` and `PATH`, we can update the root `pom.xml`:
-
-```xml
-<java.version>25</java.version>
-```
+The root `pom.xml` uses `<java.version>25</java.version>` and `maven.compiler.release` points to that value, so compiling the project requires a JDK 25 toolchain.
 
 ## Start Infrastructure
 
