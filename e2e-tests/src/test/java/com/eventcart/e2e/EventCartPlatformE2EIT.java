@@ -2,6 +2,9 @@ package com.eventcart.e2e;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -20,6 +23,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -61,6 +65,7 @@ class EventCartPlatformE2EIT {
         Path logDir = root.resolve("e2e-tests").resolve("target").resolve("service-logs");
         Files.createDirectories(logDir);
         ServicePorts ports = ServicePorts.allocate();
+        createKafkaTopics();
 
         try (ServiceProcessGroup services = new ServiceProcessGroup()) {
             services.start("catalog-service", serviceJar(root, "catalog-service"), ports.catalog(), logDir,
@@ -236,6 +241,34 @@ class EventCartPlatformE2EIT {
             return uri.replace("/test?", "/" + databaseName + "?");
         }
         return uri.replace("/test", "/" + databaseName);
+    }
+
+    /**
+     * Creates all platform topics before service consumers subscribe.
+     *
+     * <p>Without this pre-step Kafka may auto-create a topic with the broker default partition count
+     * when the first listener starts. Later services then try to increase the partition count, and
+     * already-running consumers can miss keyed records assigned to the new partitions during the E2E run.</p>
+     *
+     * @throws Exception when topic creation fails
+     */
+    private void createKafkaTopics() throws Exception {
+        try (AdminClient adminClient = AdminClient.create(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()
+        ))) {
+            adminClient.createTopics(List.of(
+                    new NewTopic("eventcart.orders.created", 3, (short) 1),
+                    new NewTopic("eventcart.inventory.reserved", 3, (short) 1),
+                    new NewTopic("eventcart.inventory.failed", 3, (short) 1),
+                    new NewTopic("eventcart.payments.completed", 3, (short) 1),
+                    new NewTopic("eventcart.payments.failed", 3, (short) 1),
+                    new NewTopic("eventcart.orders.created.DLT", 3, (short) 1),
+                    new NewTopic("eventcart.inventory.reserved.DLT", 3, (short) 1),
+                    new NewTopic("eventcart.inventory.failed.DLT", 3, (short) 1),
+                    new NewTopic("eventcart.payments.completed.DLT", 3, (short) 1),
+                    new NewTopic("eventcart.payments.failed.DLT", 3, (short) 1)
+            )).all().get(30, TimeUnit.SECONDS);
+        }
     }
 
     /**
