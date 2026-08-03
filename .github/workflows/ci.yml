@@ -11,6 +11,12 @@ permissions:
   contents: read
   packages: write
 
+env:
+  JAVA_BUILD_IMAGE: eclipse-temurin:21-jdk
+  JAVA_RUNTIME_IMAGE: eclipse-temurin:21-jre
+  DOCKER_PULL_ATTEMPTS: "4"
+  DOCKER_BUILD_ATTEMPTS: "3"
+
 jobs:
   build-test:
     name: Build and test
@@ -55,7 +61,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build service image
-        run: docker build -f services/${{ matrix.service }}/Dockerfile -t eventcart/${{ matrix.service }}:${{ github.sha }} .
+        run: bash .github/scripts/docker-build-service.sh "${{ matrix.service }}" "eventcart/${{ matrix.service }}:${{ github.sha }}"
 
   docker-publish:
     name: Publish Docker images
@@ -83,5 +89,5 @@ jobs:
       - name: Build and push service image
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/eventcart/${{ matrix.service }}:${{ github.ref_name }}"
-          docker build -f services/${{ matrix.service }}/Dockerfile -t "$IMAGE" .
+          bash .github/scripts/docker-build-service.sh "${{ matrix.service }}" "$IMAGE"
           docker push "$IMAGE"

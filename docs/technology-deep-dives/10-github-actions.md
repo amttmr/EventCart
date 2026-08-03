@@ -65,7 +65,7 @@ Main test commands:
 Docker image build:
 
 ```bash
-docker build -f services/${{ matrix.service }}/Dockerfile -t eventcart/${{ matrix.service }}:${{ github.sha }} .
+bash .github/scripts/docker-build-service.sh "${{ matrix.service }}" "eventcart/${{ matrix.service }}:${{ github.sha }}"
 ```
 
 Tag publishing:
@@ -82,6 +82,8 @@ ghcr.io/<owner>/eventcart/<service>:<tag>
 - Keep CI commands close to local developer commands.
 - Split build/test and Docker packaging into separate jobs.
 - Use matrix builds for repeated service image builds.
+- Retry external Docker pulls/builds because public registries can have transient network failures.
+- Keep base Docker images configurable with build arguments.
 - Publish only from trusted refs such as version tags.
 - Store secrets in GitHub Secrets, not in code.
 - Avoid pushing images if tests fail.
@@ -124,6 +126,7 @@ Expected successful workflow:
 | Testcontainers failure | Check Docker availability on runner and failing service logs. |
 | Unit test failure | Open failing test report and reproduce locally. |
 | Docker build failure | Check Dockerfile path, jar packaging, and build context. |
+| Docker Hub timeout | Re-run the job; the CI script pre-pulls Java base images with retry before building. |
 | Publish failure | Check package permissions and `GITHUB_TOKEN` permissions. |
 | Workflow not triggered | Check branch, tag, and `on` trigger rules. |
 
@@ -133,6 +136,20 @@ Useful local commands:
 .\mvnw.cmd -q test
 .\mvnw.cmd -P integration-tests -pl e2e-tests -am verify
 docker build -f services/catalog-service/Dockerfile -t eventcart/catalog-service:local .
+```
+
+Build with the same retry wrapper used by CI:
+
+```powershell
+bash .github/scripts/docker-build-service.sh catalog-service eventcart/catalog-service:local
+```
+
+Override Java base images if a registry mirror or hardened internal image is required:
+
+```powershell
+$env:JAVA_BUILD_IMAGE = "eclipse-temurin:21-jdk"
+$env:JAVA_RUNTIME_IMAGE = "eclipse-temurin:21-jre"
+bash .github/scripts/docker-build-service.sh inventory-service eventcart/inventory-service:local
 ```
 
 ## Real-Time Monitoring
@@ -181,4 +198,3 @@ Common interview questions:
 ## EventCart Takeaway
 
 GitHub Actions turns EventCart from a local learning app into a repeatable build-and-package project. It teaches CI, test automation, Docker packaging, release tags, and production delivery discipline.
-
