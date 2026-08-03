@@ -5,5 +5,6 @@ package com.eventcart.notification.domain;
  */
 public enum NotificationChannel {
     IN_APP,
-    EMAIL
+    EMAIL,
+    SMS
 }

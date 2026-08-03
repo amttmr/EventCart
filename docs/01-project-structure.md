@@ -11,13 +11,12 @@ EventCart/
   mvnw
   mvnw.cmd
   compose.yaml
+  .dockerignore
+  .env.example
+  .github/
+    workflows/
+      ci.yml
   .mvn/
-  docker/
-    kafka/
-    mongodb/
-    keycloak/
-    prometheus/
-    grafana/
   docs/
     00-prerequisites.md
     01-project-structure.md
@@ -37,6 +36,8 @@ EventCart/
     common-events/
     common-web/
     common-test/
+    common-security/
+    common-kafka/
   services/
     api-gateway/
     catalog-service/
@@ -45,9 +46,15 @@ EventCart/
     inventory-service/
     payment-service/
     notification-service/
+  e2e-tests/
   ops/
+    docker/
     k8s/
-    scripts/
+    keycloak/
+    observability/
+      otel/
+      prometheus/
+      grafana/
   postman/
   bruno/
 ```
@@ -58,16 +65,17 @@ EventCart/
 | --- | --- |
 | `common-events` | Shared Kafka event contracts and event metadata |
 | `common-web` | Shared API response models, exception handling helpers, correlation ID support |
-| `common-test` | Testcontainers setup, test data builders, reusable integration test utilities |
-| `common-security` | Shared JWT resource server and Keycloak role mapping for backend services |
+| `common-test` | Testcontainers dependencies, test profile constants, reusable integration test utilities |
+| `common-security` | Shared JWT resource server, Keycloak role mapping, customer ownership checks, and narrow internal service-token support |
 | `common-kafka` | Shared Kafka retry and dead-letter-topic helper |
 | `api-gateway` | External API entry point, routing, security enforcement, request correlation |
 | `catalog-service` | Product catalog, product search, categories, product availability view |
 | `cart-service` | Customer cart operations |
-| `order-service` | Order creation, order status, orchestration of order lifecycle |
-| `inventory-service` | Stock management, reservation, release, inventory events |
-| `payment-service` | Payment simulation, payment status, failure scenarios |
-| `notification-service` | Async customer/admin notifications |
+| `order-service` | Order creation, Redis idempotency, order outbox, order status updates, lifecycle orchestration |
+| `inventory-service` | Stock management, reservation, release, inventory outbox events |
+| `payment-service` | Payment simulation, payment status, payment outbox events |
+| `notification-service` | Async customer notifications, notification history, optional email/SMS delivery |
+| `e2e-tests` | Docker-backed end-to-end tests that launch service jars and exercise the full platform flow |
 
 ## Standard Service Layout
 
@@ -85,6 +93,7 @@ src/main/java/com/eventcart/<service>/
   mapper/
   event/
   exception/
+  outbox/
   security/
 
 src/main/resources/

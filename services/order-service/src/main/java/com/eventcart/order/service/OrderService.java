@@ -4,6 +4,7 @@ import com.eventcart.common.events.InventoryReservationFailedEvent;
 import com.eventcart.common.events.InventoryReservedEvent;
 import com.eventcart.common.events.PaymentCompletedEvent;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.security.CustomerAccessPolicy;
 import com.eventcart.order.client.CartClient;
 import com.eventcart.order.client.CartResponse;
 import com.eventcart.order.domain.OrderDocument;
@@ -18,6 +19,7 @@ import com.eventcart.order.outbox.OrderOutboxService;
 import com.eventcart.order.repository.OrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -35,6 +37,7 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final OrderOutboxService orderOutboxService;
     private final OrderIdempotencyService orderIdempotencyService;
+    private final CustomerAccessPolicy customerAccessPolicy;
 
     /**
      * Creates an order service.
@@ -44,19 +47,22 @@ public class OrderService {
      * @param orderMapper mapper between cart data, order documents, DTOs, and events
      * @param orderOutboxService outbox service used to enqueue order events
      * @param orderIdempotencyService Redis-backed idempotency helper
+     * @param customerAccessPolicy ownership policy for customer-scoped lookups
      */
     public OrderService(
             OrderRepository orderRepository,
             CartClient cartClient,
             OrderMapper orderMapper,
             OrderOutboxService orderOutboxService,
-            OrderIdempotencyService orderIdempotencyService
+            OrderIdempotencyService orderIdempotencyService,
+            CustomerAccessPolicy customerAccessPolicy
     ) {
         this.orderRepository = orderRepository;
         this.cartClient = cartClient;
         this.orderMapper = orderMapper;
         this.orderOutboxService = orderOutboxService;
         this.orderIdempotencyService = orderIdempotencyService;
+        this.customerAccessPolicy = customerAccessPolicy;
     }
 
     /**
@@ -224,7 +230,12 @@ public class OrderService {
      */
     public OrderResponse getOrder(String orderId) {
         log.debug("Fetching order orderId={}", orderId);
-        return orderMapper.toResponse(findOrder(orderId));
+        OrderDocument order = findOrder(orderId);
+        customerAccessPolicy.requireCustomerAccess(
+                order.getCustomerId(),
+                SecurityContextHolder.getContext().getAuthentication()
+        );
+        return orderMapper.toResponse(order);
     }
 
     /**

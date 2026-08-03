@@ -35,15 +35,15 @@ logging:
 | Create product | `Creating product`, `Product created` |
 | Add to cart | `Adding cart item`, `Calling catalog-service`, `Cart item added` |
 | Place order | `Placing order`, `Order idempotency key reserved`, `Cart fetched for order`, `Order saved` |
-| Outbox publishing | `OrderCreated event stored in outbox`, `Outbox event published`, `Publishing OrderCreated event` |
+| Outbox publishing | `OrderCreated event stored in outbox`, `Inventory event stored in outbox`, `Payment event stored in outbox`, `Outbox event published` |
 | Inventory reservation | `Consumed OrderCreated event`, `Reserving inventory`, `Inventory reserved` |
-| Failed inventory | `Reservation stock check failed`, `Inventory reservation failed`, `Publishing InventoryReservationFailed event` |
+| Failed inventory | `Reservation stock check failed`, `Inventory reservation failed`, `Inventory outbox event published` |
 | Order status update | `Consumed InventoryReserved event`, `Order status updated after inventory reservation`, `Cart clear completed` |
 | Order failure update | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
-| Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
+| Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed`, `Payment outbox event published` |
 | Final order payment update | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
 | Inventory compensation | `Consumed PaymentFailed event`, `Releasing inventory after payment failure`, `Inventory released after payment failure` |
-| Notification projection | `Consumed OrderCreated event for notification`, `Notification stored`, `Notification marked read` |
+| Notification projection | `Consumed OrderCreated event for notification`, `Notification stored`, `Email notification sent`, `SMS notification sent`, `Notification marked read` |
 | Gateway routing/security | Gateway route logs, `401 Unauthorized`, `403 Forbidden`, and `X-Correlation-Id` response headers |
 
 ## Debug Correlation IDs
@@ -100,6 +100,42 @@ GET eventcart:orders:idempotency:customer-1-order-20260802-001
 ```
 
 During processing, the value is `IN_PROGRESS`. After the order is saved, the value becomes `ORDER:<order-id>`.
+
+## Debug Outbox Collections
+
+Each event-producing service stores pending events before Kafka publication:
+
+```javascript
+use eventcart_order
+db.outbox_events.find().sort({ createdAt: -1 }).limit(5).pretty()
+
+use eventcart_inventory
+db.outbox_events.find().sort({ createdAt: -1 }).limit(5).pretty()
+
+use eventcart_payment
+db.outbox_events.find().sort({ createdAt: -1 }).limit(5).pretty()
+```
+
+Expected successful publishing state is `PUBLISHED`. If Kafka is down, records stay `PENDING` until the scheduler retries. After repeated failures, records move to `FAILED` with `lastError`.
+
+## Debug Ownership And Internal Calls
+
+- Customer APIs require the JWT customer claim to match the requested `customerId`, unless the caller has `ADMIN` or `SUPPORT`.
+- Keycloak local user `customer-user` includes `customer_id=customer-1`.
+- order-service forwards the incoming bearer token when it reads the cart during order placement.
+- order-service uses `X-EventCart-Internal-Token` only when a Kafka listener clears the cart after inventory reservation.
+- In real environments, set `EVENTCART_INTERNAL_SERVICE_TOKEN` from a secret store and avoid logging the token value.
+
+## Debug Notification Providers
+
+notification-service always stores notification history first. Email and SMS provider calls happen after the notification record is saved.
+
+If real delivery is missing:
+
+- Check `eventcart.notifications.email.enabled` and `eventcart.notifications.sms.enabled`.
+- Check customer contact configuration under `eventcart.notifications.contacts`.
+- Check SMTP or Twilio environment variables.
+- Check notification-service logs for provider delivery warnings.
 
 ## Interview Talking Points
 

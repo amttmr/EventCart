@@ -40,6 +40,22 @@
         "http://localhost:8084",
         "http://localhost:8085",
         "http://localhost:8086"
+      ],
+      "protocolMappers": [
+        {
+          "name": "customer-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "customer_id",
+            "claim.name": "customer_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
       ]
     }
   ],
@@ -67,6 +83,11 @@
       "emailVerified": true,
       "firstName": "EventCart",
       "lastName": "Customer",
+      "attributes": {
+        "customer_id": [
+          "customer-1"
+        ]
+      },
       "credentials": [
         {
           "type": "password",

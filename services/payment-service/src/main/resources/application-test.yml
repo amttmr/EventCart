@@ -12,6 +12,9 @@ spring:
 eventcart:
   security:
     enabled: false
+  outbox:
+    initial-delay: 1h
+    poll-delay: 1h
   payment:
     simulation:
       provider-name: MockPay

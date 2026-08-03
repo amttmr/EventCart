@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Publishes inventory reservation result events to Kafka.
  */
@@ -41,21 +43,20 @@ public class InventoryEventPublisher {
      *
      * @param event event payload to publish
      */
-    public void publishInventoryReserved(InventoryReservedEvent event) {
+    public CompletableFuture<?> publishInventoryReserved(InventoryReservedEvent event) {
         log.info("Publishing InventoryReserved event orderId={} eventId={} topic={}",
                 event.orderId(), event.metadata().eventId(), inventoryReservedTopic);
         var future = kafkaTemplate.send(inventoryReservedTopic, event.orderId(), event);
-        if (future != null) {
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish InventoryReserved event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), inventoryReservedTopic, ex);
-                } else {
-                    log.debug("Published InventoryReserved event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), inventoryReservedTopic);
-                }
-            });
-        }
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to publish InventoryReserved event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), inventoryReservedTopic, ex);
+            } else {
+                log.debug("Published InventoryReserved event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), inventoryReservedTopic);
+            }
+        });
+        return future;
     }
 
     /**
@@ -63,20 +64,19 @@ public class InventoryEventPublisher {
      *
      * @param event event payload to publish
      */
-    public void publishInventoryFailed(InventoryReservationFailedEvent event) {
+    public CompletableFuture<?> publishInventoryFailed(InventoryReservationFailedEvent event) {
         log.info("Publishing InventoryReservationFailed event orderId={} eventId={} topic={}",
                 event.orderId(), event.metadata().eventId(), inventoryFailedTopic);
         var future = kafkaTemplate.send(inventoryFailedTopic, event.orderId(), event);
-        if (future != null) {
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish InventoryReservationFailed event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), inventoryFailedTopic, ex);
-                } else {
-                    log.debug("Published InventoryReservationFailed event orderId={} eventId={} topic={}",
-                            event.orderId(), event.metadata().eventId(), inventoryFailedTopic);
-                }
-            });
-        }
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to publish InventoryReservationFailed event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), inventoryFailedTopic, ex);
+            } else {
+                log.debug("Published InventoryReservationFailed event orderId={} eventId={} topic={}",
+                        event.orderId(), event.metadata().eventId(), inventoryFailedTopic);
+            }
+        });
+        return future;
     }
 }

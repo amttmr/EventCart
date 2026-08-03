@@ -6,6 +6,7 @@ import com.eventcart.common.events.InventoryReservedEvent;
 import com.eventcart.common.events.InventoryReservedItem;
 import com.eventcart.common.events.PaymentCompletedEvent;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.security.CustomerAccessPolicy;
 import com.eventcart.order.client.CartClient;
 import com.eventcart.order.client.CartItemResponse;
 import com.eventcart.order.client.CartResponse;
@@ -39,12 +40,14 @@ class OrderServiceTest {
     private final OrderMapper orderMapper = new OrderMapper();
     private final OrderOutboxService orderOutboxService = mock(OrderOutboxService.class);
     private final OrderIdempotencyService orderIdempotencyService = mock(OrderIdempotencyService.class);
+    private final CustomerAccessPolicy customerAccessPolicy = new CustomerAccessPolicy(false);
     private final OrderService orderService = new OrderService(
             orderRepository,
             cartClient,
             orderMapper,
             orderOutboxService,
-            orderIdempotencyService
+            orderIdempotencyService,
+            customerAccessPolicy
     );
 
     /**

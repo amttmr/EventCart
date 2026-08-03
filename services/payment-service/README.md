@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-This service consumes `InventoryReservedEvent` from Kafka, simulates a payment attempt, stores the attempt in MongoDB, and publishes either `PaymentCompletedEvent` or `PaymentFailedEvent`.
+This service consumes `InventoryReservedEvent` from Kafka, simulates a payment attempt, stores the attempt in MongoDB, and stores either `PaymentCompletedEvent` or `PaymentFailedEvent` in the MongoDB outbox before Kafka publication.
 
 ## Current Functionality
 
@@ -14,7 +14,8 @@ This service consumes `InventoryReservedEvent` from Kafka, simulates a payment a
 | Payment simulation | Completes or fails payment based on a configurable amount threshold |
 | Payment attempt snapshot | Stores payment attempt result in MongoDB |
 | Idempotent consumer | Skips duplicate processing when an order already has a payment attempt |
-| Kafka producer | Publishes `PaymentCompletedEvent` or `PaymentFailedEvent` |
+| Transactional outbox | Stores payment result events in `outbox_events` before Kafka publication |
+| Kafka producer | Publishes pending payment outbox events |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs
@@ -42,14 +43,15 @@ Payments below `50000.00` complete successfully. Payments at or above `50000.00`
 | Topic | Direction | Purpose |
 | --- | --- | --- |
 | `eventcart.inventory.reserved` | Consumes | Starts payment processing after stock is reserved |
-| `eventcart.payments.completed` | Produces | Tells order-service payment completed |
-| `eventcart.payments.failed` | Produces | Tells order-service payment failed |
+| `eventcart.payments.completed` | Produces through outbox | Tells order-service payment completed |
+| `eventcart.payments.failed` | Produces through outbox | Tells order-service payment failed |
 
 ## MongoDB Collection
 
 | Database | Collection | Purpose |
 | --- | --- | --- |
 | `eventcart_payment` | `payment_attempts` | Stores one payment attempt per order |
+| `eventcart_payment` | `outbox_events` | Stores pending, published, and failed payment result events |
 
 ## Local URLs
 
@@ -62,4 +64,4 @@ Payments below `50000.00` complete successfully. Payments at or above `50000.00`
 
 ## Interview Angle
 
-This service demonstrates event chaining, deterministic external-provider simulation, idempotent Kafka consumers, MongoDB persistence, and eventual consistency across inventory, payment, and order status updates.
+This service demonstrates event chaining, deterministic external-provider simulation, idempotent Kafka consumers, MongoDB persistence, transactional outbox publishing, and eventual consistency across inventory, payment, and order status updates.

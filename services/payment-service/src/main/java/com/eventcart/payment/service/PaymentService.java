@@ -1,16 +1,18 @@
 package com.eventcart.payment.service;
 
 import com.eventcart.common.events.InventoryReservedEvent;
+import com.eventcart.common.security.CustomerAccessPolicy;
 import com.eventcart.payment.config.PaymentSimulationProperties;
 import com.eventcart.payment.domain.PaymentAttemptDocument;
 import com.eventcart.payment.domain.PaymentStatus;
 import com.eventcart.payment.dto.PaymentAttemptResponse;
-import com.eventcart.payment.event.PaymentEventPublisher;
 import com.eventcart.payment.exception.PaymentAttemptNotFoundException;
 import com.eventcart.payment.mapper.PaymentMapper;
+import com.eventcart.payment.outbox.PaymentOutboxService;
 import com.eventcart.payment.repository.PaymentAttemptRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -26,27 +28,31 @@ public class PaymentService {
 
     private final PaymentAttemptRepository paymentAttemptRepository;
     private final PaymentMapper paymentMapper;
-    private final PaymentEventPublisher eventPublisher;
+    private final PaymentOutboxService outboxService;
     private final PaymentSimulationProperties simulationProperties;
+    private final CustomerAccessPolicy customerAccessPolicy;
 
     /**
      * Creates a payment service.
      *
      * @param paymentAttemptRepository repository for payment attempts
      * @param paymentMapper mapper between payment documents, DTOs, and events
-     * @param eventPublisher Kafka publisher for payment result events
+     * @param outboxService outbox service for reliable payment result publishing
      * @param simulationProperties mock provider behavior configuration
+     * @param customerAccessPolicy ownership policy for customer-scoped lookups
      */
     public PaymentService(
             PaymentAttemptRepository paymentAttemptRepository,
             PaymentMapper paymentMapper,
-            PaymentEventPublisher eventPublisher,
-            PaymentSimulationProperties simulationProperties
+            PaymentOutboxService outboxService,
+            PaymentSimulationProperties simulationProperties,
+            CustomerAccessPolicy customerAccessPolicy
     ) {
         this.paymentAttemptRepository = paymentAttemptRepository;
         this.paymentMapper = paymentMapper;
-        this.eventPublisher = eventPublisher;
+        this.outboxService = outboxService;
         this.simulationProperties = simulationProperties;
+        this.customerAccessPolicy = customerAccessPolicy;
     }
 
     /**
@@ -79,7 +85,7 @@ public class PaymentService {
             PaymentAttemptDocument savedAttempt = paymentAttemptRepository.save(attempt);
             log.warn("Payment failed orderId={} paymentId={} reason={}",
                     event.orderId(), savedAttempt.getId(), failureReason.get());
-            eventPublisher.publishPaymentFailed(paymentMapper.toPaymentFailedEvent(savedAttempt));
+            outboxService.enqueuePaymentFailed(paymentMapper.toPaymentFailedEvent(savedAttempt));
             return paymentMapper.toResponse(savedAttempt);
         }
 
@@ -88,7 +94,7 @@ public class PaymentService {
         PaymentAttemptDocument savedAttempt = paymentAttemptRepository.save(attempt);
         log.info("Payment completed orderId={} paymentId={} providerTransactionId={}",
                 event.orderId(), savedAttempt.getId(), savedAttempt.getProviderTransactionId());
-        eventPublisher.publishPaymentCompleted(paymentMapper.toPaymentCompletedEvent(savedAttempt));
+        outboxService.enqueuePaymentCompleted(paymentMapper.toPaymentCompletedEvent(savedAttempt));
         return paymentMapper.toResponse(savedAttempt);
     }
 
@@ -100,11 +106,16 @@ public class PaymentService {
      */
     public PaymentAttemptResponse getPaymentAttemptForOrder(String orderId) {
         log.debug("Fetching payment attempt orderId={}", orderId);
-        return paymentMapper.toResponse(paymentAttemptRepository.findByOrderId(orderId)
+        PaymentAttemptDocument attempt = paymentAttemptRepository.findByOrderId(orderId)
                 .orElseThrow(() -> {
                     log.warn("Payment attempt not found orderId={}", orderId);
                     return new PaymentAttemptNotFoundException("Payment attempt not found for order: " + orderId);
-                }));
+                });
+        customerAccessPolicy.requireCustomerAccess(
+                attempt.getCustomerId(),
+                SecurityContextHolder.getContext().getAuthentication()
+        );
+        return paymentMapper.toResponse(attempt);
     }
 
     /**

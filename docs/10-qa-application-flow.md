@@ -2,7 +2,7 @@
 
 This is the living handoff guide for QA engineers and new joiners. It explains the current EventCart application flow, the order in which APIs should be called, and how to verify results through APIs, MongoDB, Redis, Kafka, and logs.
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Use this document when you need to:
 
 ## Current Scope
 
-The current working slice covers API Gateway routing, Keycloak JWT security, product catalog, cart, order placement, outbox publishing, inventory reservation, payment simulation, notification history, Redis idempotency, Kafka retry/DLQ handling, and Kafka-based order status updates.
+The current working slice covers API Gateway routing, Keycloak JWT security, customer ownership checks, product catalog, cart, order placement, transactional outbox publishing in order/inventory/payment services, inventory reservation, payment simulation, notification history, optional email/SMS delivery, Redis idempotency, Kafka retry/DLQ handling, observability, Docker/CI/Kubernetes packaging, and Kafka-based order status updates.
 
 | Area | Current state |
 | --- | --- |
@@ -24,14 +24,17 @@ The current working slice covers API Gateway routing, Keycloak JWT security, pro
 | Cart | Add, update, remove, clear, and read customer carts |
 | Orders | Place order from cart, store order snapshot, publish `OrderCreatedEvent` |
 | Inventory | Seed stock, consume order events, reserve stock, publish reservation result events |
-| Payments | Consume inventory success events, simulate payment, publish payment result events |
-| Notifications | Consume order/payment events and store customer notification history |
+| Payments | Consume inventory success events, simulate payment, publish payment result events through outbox |
+| Notifications | Consume order/payment events, store customer notification history, optionally deliver email/SMS |
 | API Gateway | Route client APIs and enforce JWT role checks |
-| Security | Keycloak realm with `ADMIN`, `CUSTOMER`, and `SUPPORT` roles |
-| Outbox | Store order-created events before Kafka publication |
+| Security | Keycloak realm with `ADMIN`, `CUSTOMER`, and `SUPPORT` roles plus customer ownership checks |
+| Outbox | Store order, inventory, and payment events before Kafka publication |
 | Kafka retry/DLQ | Retry failed consumers and route exhausted messages to `<topic>.dlq` |
 | Order status | Consume inventory and payment result events and update order status |
 | Redis | Store order idempotency keys for safe order-placement retries |
+| Observability | Expose Actuator/Prometheus metrics, OTLP traces, and Grafana dashboard |
+| Deployment | Dockerfiles, GitHub Actions workflow, Kubernetes manifests, and secret templates |
+| E2E tests | Docker-backed test launches service jars and verifies order-to-notification flow |
 | OpenAPI | Swagger UI available for all implemented services |
 
 ## Services And Local Ports
@@ -49,6 +52,9 @@ The current working slice covers API Gateway routing, Keycloak JWT security, pro
 | Kafka | 9092 | Local event broker | Docker container `eventcart-kafka` |
 | Redis | 6379 | Local cache/key-value store | Docker container `eventcart-redis` |
 | Keycloak | 8088 | Local identity provider | Docker container `eventcart-keycloak` |
+| Prometheus | 9090 | Metrics scraping and query UI | Docker container `eventcart-prometheus` |
+| Grafana | 3000 | Metrics dashboard UI | Docker container `eventcart-grafana` |
+| OpenTelemetry Collector | 4317/4318 | Trace/metric collector endpoint | Docker container `eventcart-otel-collector` |
 
 ## High-Level Flow
 
@@ -67,14 +73,18 @@ flowchart TD
     I --> J{"Stock available?"}
     J -->|Yes| K["inventory-service reserves stock"]
     J -->|No| L["inventory-service records failed reservation"]
-    K --> M["inventory-service publishes InventoryReservedEvent"]
-    L --> N["inventory-service publishes InventoryReservationFailedEvent"]
+    K --> M1["inventory-service stores InventoryReservedEvent in outbox"]
+    L --> N1["inventory-service stores InventoryReservationFailedEvent in outbox"]
+    M1 --> M["inventory-service outbox publisher sends InventoryReservedEvent"]
+    N1 --> N["inventory-service outbox publisher sends InventoryReservationFailedEvent"]
     M --> O["order-service updates order to INVENTORY_RESERVED"]
     O --> P["order-service clears cart"]
     M --> R["payment-service simulates payment"]
     R --> S{"Payment accepted?"}
-    S -->|Yes| T["payment-service publishes PaymentCompletedEvent"]
-    S -->|No| U["payment-service publishes PaymentFailedEvent"]
+    S -->|Yes| T1["payment-service stores PaymentCompletedEvent in outbox"]
+    S -->|No| U1["payment-service stores PaymentFailedEvent in outbox"]
+    T1 --> T["payment-service outbox publisher sends PaymentCompletedEvent"]
+    U1 --> U["payment-service outbox publisher sends PaymentFailedEvent"]
     T --> V["order-service updates order to PAYMENT_COMPLETED"]
     T --> Z3["notification-service records payment success notification"]
     U --> W["order-service updates order to PAYMENT_FAILED"]
@@ -99,10 +109,20 @@ Start infrastructure:
 docker compose up -d
 ```
 
+This starts MongoDB, Kafka, Redis, Keycloak, OpenTelemetry Collector, Prometheus, and Grafana.
+
 Verify containers:
 
 ```powershell
 docker compose ps
+```
+
+Optional observability checks:
+
+```text
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3000
+OTLP HTTP endpoint: http://localhost:4318
 ```
 
 Start services in separate terminals, in this order:
@@ -118,6 +138,14 @@ Start services in separate terminals, in this order:
 ```
 
 The startup order matters for manual testing because cart-service calls catalog-service, order-service calls cart-service, api-gateway routes to every backend service, and inventory/order/payment/notification communicate through Kafka.
+
+For an automated platform smoke test with Docker-backed MongoDB, Kafka, and Redis:
+
+```powershell
+.\mvnw.cmd -P integration-tests -pl e2e-tests -am verify
+```
+
+This launches the service jars and verifies product creation, inventory seed, cart add, order placement, inventory reservation, payment completion, final order status, and notifications.
 
 ## Security Tokens
 
@@ -144,6 +172,8 @@ $tokenResponse = Invoke-RestMethod -Method Post `
 
 $customerToken = $tokenResponse.access_token
 ```
+
+The local `customer-user` token contains `customer_id=customer-1`. Customer APIs reject requests for a different customer ID unless the caller has an admin/support role.
 
 The curl examples below show `<admin-token>` or `<customer-token>`. Replace those placeholders with the token value or call the same API through PowerShell using the variables above.
 
@@ -203,7 +233,7 @@ curl -X POST \
 Expected API result:
 
 - Response code is 200.
-- Response contains `data.productId`.
+- Response contains `data.id`.
 - Save the returned product ID for the next steps.
 
 Example product ID:
@@ -348,6 +378,7 @@ Important behavior:
 - order-service stores an order snapshot in MongoDB.
 - order-service stores `OrderCreatedEvent` in MongoDB collection `outbox_events`.
 - order-service outbox publisher publishes pending events to Kafka topic `eventcart.orders.created`.
+- order-service forwards the customer JWT to cart-service while reading the cart.
 - The initial order API response can return before inventory processing completes.
 
 Expected API result:
@@ -371,6 +402,8 @@ use eventcart_order
 db.orders.find({ _id: ObjectId("<order-id>") }).pretty()
 db.outbox_events.find({ aggregateId: "<order-id>" }).pretty()
 ```
+
+Expected outbox result: an `ORDER` aggregate record exists. Its `status` should become `PUBLISHED` after the scheduler publishes it to Kafka.
 
 Verify Redis idempotency key:
 
@@ -419,6 +452,15 @@ Expected result:
 - `reservedQuantity` increased by ordered quantity.
 - `availableQuantity` decreased by ordered quantity.
 
+Verify inventory outbox:
+
+```javascript
+use eventcart_inventory
+db.outbox_events.find({ aggregateId: "<order-id>" }).pretty()
+```
+
+Expected outbox result: an `INVENTORY` aggregate record exists for either the reserved or failed event, and its `status` should become `PUBLISHED`.
+
 ### Step 7: Verify Inventory Order Status Update
 
 Call order-service again:
@@ -456,7 +498,10 @@ Verify through MongoDB:
 ```javascript
 use eventcart_payment
 db.payment_attempts.find({ orderId: "<order-id>" }).pretty()
+db.outbox_events.find({ aggregateId: "<order-id>" }).pretty()
 ```
+
+Expected outbox result: a `PAYMENT` aggregate record exists for the completed or failed event, and its `status` should become `PUBLISHED`.
 
 Payment simulation rule:
 
@@ -556,7 +601,7 @@ docker exec -it eventcart-kafka /opt/kafka/bin/kafka-console-consumer.sh --boots
 
 ## Notification Verification
 
-notification-service creates in-app notifications asynchronously from Kafka events.
+notification-service creates persisted notifications asynchronously from Kafka events. If email or SMS providers are enabled, it attempts delivery after saving the notification record.
 
 List customer notifications:
 
@@ -578,6 +623,19 @@ Verify through MongoDB:
 use eventcart_notification
 db.notifications.find({ customerId: "customer-1" }).pretty()
 ```
+
+Optional provider configuration:
+
+```powershell
+$env:SPRING_MAIL_HOST = "smtp.example.com"
+$env:SPRING_MAIL_USERNAME = "smtp-user"
+$env:SPRING_MAIL_PASSWORD = "smtp-password"
+$env:TWILIO_ACCOUNT_SID = "replace-me"
+$env:TWILIO_AUTH_TOKEN = "replace-me"
+$env:TWILIO_FROM_NUMBER = "+15555550100"
+```
+
+Then enable `eventcart.notifications.email.enabled` or `eventcart.notifications.sms.enabled` in notification-service configuration and make sure the customer has contact details under `eventcart.notifications.contacts`.
 
 Mark a notification read:
 
@@ -769,17 +827,17 @@ Expected result: cart-service rejects the request because inactive or missing pr
 | --- | --- | --- |
 | catalog-service | Create product | `Creating product`, `Product created` |
 | cart-service | Add item | `Adding cart item`, `Calling catalog-service`, `Cart item added` |
-| order-service | Place order | `Placing order`, `Order saved`, `Publishing OrderCreated event` |
+| order-service | Place order | `Placing order`, `Order saved`, `OrderCreated event stored in outbox` |
 | order-service | Outbox | `OrderCreated event stored in outbox`, `Outbox event published` |
 | order-service | Redis idempotency | `Order idempotency key reserved`, `Order idempotency key completed`, `Order idempotency key reused` |
-| inventory-service | Reservation | `Consumed OrderCreated event`, `Reserving inventory`, `Inventory reserved` |
-| inventory-service | Failed reservation | `Reservation stock check failed`, `Inventory reservation failed` |
+| inventory-service | Reservation | `Consumed OrderCreated event`, `Reserving inventory`, `Inventory reserved`, `Inventory event stored in outbox` |
+| inventory-service | Failed reservation | `Reservation stock check failed`, `Inventory reservation failed`, `Inventory outbox event published` |
 | order-service | Inventory success | `Consumed InventoryReserved event`, `Order status updated after inventory reservation`, `Cart clear completed` |
 | order-service | Inventory failure | `Consumed InventoryReservationFailed event`, `Order status updated after inventory failure` |
-| payment-service | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed` |
+| payment-service | Payment processing | `Consumed InventoryReserved event`, `Processing payment`, `Payment completed`, `Payment failed`, `Payment event stored in outbox` |
 | order-service | Payment result | `Consumed PaymentCompleted event`, `Consumed PaymentFailed event`, `Order status updated after payment` |
 | inventory-service | Payment compensation | `Consumed PaymentFailed event`, `Releasing inventory after payment failure`, `Inventory released after payment failure` |
-| notification-service | Notifications | `Consumed OrderCreated event for notification`, `Notification stored`, `Notification marked read` |
+| notification-service | Notifications | `Consumed OrderCreated event for notification`, `Notification stored`, `Email notification sent`, `SMS notification sent`, `Notification marked read` |
 | api-gateway | Routing/security | Gateway route logs and `X-Correlation-Id` response header |
 
 To increase detail temporarily, set this in a service `application.yml`:
@@ -794,7 +852,7 @@ logging:
 
 | Check | Expected result |
 | --- | --- |
-| Docker containers are running | MongoDB, Kafka, Redis, and Keycloak are healthy |
+| Docker containers are running | MongoDB, Kafka, Redis, Keycloak, OpenTelemetry Collector, Prometheus, and Grafana are healthy |
 | All services are healthy | `/actuator/health` returns `UP` |
 | Keycloak token works | Customer/admin token can call role-appropriate APIs |
 | Product created | Product exists in API and `eventcart_catalog.products` |
@@ -802,18 +860,23 @@ logging:
 | Cart item added | Cart contains product snapshot in API and MongoDB |
 | Order placed | Order exists in `eventcart_order.orders` with status `CREATED` initially |
 | Redis key created | Idempotency key value is `ORDER:<order-id>` |
-| Outbox event stored | `eventcart_order.outbox_events` contains the order-created event |
+| Order outbox event stored | `eventcart_order.outbox_events` contains the order-created event |
 | Kafka order event published | Message appears on `eventcart.orders.created` |
 | Inventory reserved | Reservation status is `RESERVED` |
+| Inventory outbox event stored | `eventcart_inventory.outbox_events` contains the reservation result event |
 | Inventory order status updated | Order status becomes `INVENTORY_RESERVED` |
 | Payment attempt created | Payment exists in `eventcart_payment.payment_attempts` |
+| Payment outbox event stored | `eventcart_payment.outbox_events` contains the payment result event |
 | Payment event published | Message appears on `eventcart.payments.completed` or `eventcart.payments.failed` |
 | Final order status updated | Order status becomes `PAYMENT_COMPLETED` or `PAYMENT_FAILED` |
 | Cart cleared | Customer cart is empty after successful reservation |
 | Failed payment compensation | Reservation becomes `RELEASED` and stock is returned |
 | Notifications created | `eventcart_notification.notifications` contains order/payment notifications |
+| Provider delivery optional | Email/SMS delivery logs appear only when providers are enabled and contacts exist |
+| Ownership enforced | `customer-user` can access `customer-1`; another customer ID returns `403` |
 | Correlation ID present | Responses include `X-Correlation-Id`, and logs show the same ID |
 | DLQ topics exist | `<topic>.dlq` topics appear in Kafka topic list |
+| Observability available | Prometheus and Grafana are reachable on local ports |
 
 ## Troubleshooting Guide
 
@@ -821,9 +884,11 @@ logging:
 | --- | --- | --- |
 | `EMPTY_CART` while placing order | Customer cart has no items | Call `GET /api/v1/carts/customer-1`, then add an item |
 | `401 Unauthorized` | Missing or expired JWT token | Fetch a fresh Keycloak token and send `Authorization: Bearer <token>` |
-| `403 Forbidden` | Token role is not allowed for that API | Use `ADMIN` for product/inventory, `CUSTOMER` for cart/order/notifications, or `SUPPORT` for lookup APIs |
+| `403 Forbidden` | Token role is not allowed or customer ownership check failed | Use `ADMIN` for product/inventory, `CUSTOMER` for cart/order/notifications, `SUPPORT` for lookup APIs, and make sure customer token matches the requested `customerId` |
 | Cart add fails | Product ID is wrong, inactive, or catalog-service is down | Check product API and cart-service logs |
 | Order exists but no Kafka message | Outbox publisher has not published yet or Kafka is down | Check `eventcart_order.outbox_events` status and order-service logs |
+| Inventory result not published | Inventory outbox publisher has not published yet or Kafka is down | Check `eventcart_inventory.outbox_events` status and inventory-service logs |
+| Payment result not published | Payment outbox publisher has not published yet or Kafka is down | Check `eventcart_payment.outbox_events` status and payment-service logs |
 | Order stays `CREATED` | Kafka, inventory-service, or order-service consumer is not processing | Check Kafka topics and service logs |
 | Order becomes `INVENTORY_FAILED` | Stock is missing or insufficient | Check inventory quantity and reservation reason |
 | Payment attempt not found | payment-service is not running or did not consume `InventoryReservedEvent` | Check payment-service health and Kafka topic `eventcart.inventory.reserved` |
@@ -832,9 +897,11 @@ logging:
 | Reservation stays `RESERVED` after payment failure | inventory-service did not consume `PaymentFailedEvent` | Check inventory-service logs and Kafka topic `eventcart.payments.failed` |
 | Message appears in `.dlq` topic | Consumer failed all retry attempts | Inspect service logs and the DLQ record payload |
 | Notification missing | notification-service is down or has not consumed the event yet | Check notification-service logs and relevant Kafka topics |
-| Cart not cleared after success | cart-service was unavailable during cleanup | Check order-service warning logs and cart-service health |
+| Email/SMS not delivered | Provider disabled, missing credentials, or missing customer contact | Check notification-service provider settings and logs |
+| Cart not cleared after success | cart-service was unavailable or internal service token mismatch | Check order-service warning logs, cart-service health, and `EVENTCART_INTERNAL_SERVICE_TOKEN` |
 | Duplicate order confusion | Reused idempotency key | Use a fresh key or inspect Redis value |
 | Cannot connect to MongoDB | Docker container not running or wrong credentials | Run `docker compose ps` and check `compose.yaml` |
+| Grafana dashboard empty | Services are not running or Prometheus scrape targets are down | Check `http://localhost:9090/targets` and service `/actuator/prometheus` endpoints |
 | Port already in use | Another process uses service port | Stop the process or change `server.port` temporarily |
 
 ## Interview And Onboarding Notes
@@ -850,11 +917,16 @@ New joiners should be able to explain:
 - Why payment-service consumes `InventoryReservedEvent` instead of `OrderCreatedEvent`.
 - How payment-service handles duplicate Kafka messages.
 - Why inventory-service performs a compensating release after payment failure.
-- Why order-service uses the outbox pattern before publishing `OrderCreatedEvent`.
+- Why order-service, inventory-service, and payment-service use the outbox pattern before publishing events.
 - Why consumers need retry and DLQ handling.
 - Why Keycloak/JWT is used with role-based access.
+- Why customer ownership checks are needed in addition to role-based access.
 - Why the gateway is useful even though backend services still validate JWTs.
+- Why asynchronous service-to-service cleanup needs a separate internal credential.
 - How `X-Correlation-Id` helps trace one flow across REST calls and Kafka events.
+- How Prometheus, Grafana, and OpenTelemetry fit together.
+- Why secrets should be injected from environment variables, CI/CD stores, or Kubernetes secret integrations.
+- Why notification history is persisted before email/SMS provider delivery is attempted.
 
 ## Maintenance Rule
 
@@ -865,6 +937,9 @@ Update this guide whenever any of the following changes:
 - A Kafka topic, event payload, producer, or consumer changes.
 - Redis key format or idempotency behavior changes.
 - Service startup order, port, or local infrastructure changes.
+- Security rules, ownership checks, or internal service-token behavior changes.
+- Notification provider configuration or contact resolution changes.
+- Observability, Docker, CI/CD, Kubernetes, or secret handling changes.
 - New services such as payment-service, notification-service, gateway, or security are added.
 
 After updating this Markdown file, regenerate the Word document:

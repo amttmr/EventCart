@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, publishes an `OrderCreated` Kafka event, consumes inventory and payment result events, updates order status, and clears the cart after successful inventory reservation.
+This service creates an order from the customer's cart. It calls cart-service, stores an order snapshot in MongoDB, stores `OrderCreatedEvent` in the MongoDB outbox before Kafka publication, consumes inventory and payment result events, updates order status, and clears the cart after successful inventory reservation.
 
 ## Current Functionality
 
@@ -14,11 +14,13 @@ This service creates an order from the customer's cart. It calls cart-service, s
 | Redis idempotency | Uses an optional `idempotencyKey` to make order-placement retries safe |
 | Cart lookup | Uses Spring RestClient to call cart-service with timeout and error handling |
 | Order snapshot | Stores cart item snapshots inside the order document |
-| Kafka producer | Publishes `OrderCreatedEvent` to the `eventcart.orders.created` topic |
+| Transactional outbox | Stores `OrderCreatedEvent` in `outbox_events` before Kafka publication |
+| Kafka producer | Publishes pending order outbox events to the `eventcart.orders.created` topic |
 | Kafka consumers | Consumes `InventoryReservedEvent` and `InventoryReservationFailedEvent` |
 | Payment consumers | Consumes `PaymentCompletedEvent` and `PaymentFailedEvent` |
 | Order status updates | Moves orders from `CREATED` to inventory and payment result states |
-| Cart cleanup | Clears the customer's cart after inventory has been reserved |
+| Cart cleanup | Clears the customer's cart after inventory has been reserved, using an internal token when the cleanup is Kafka-triggered |
+| Ownership checks | Restricts customer-scoped order lookups to the matching customer, admin, or support |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs
@@ -44,7 +46,7 @@ This service creates an order from the customer's cart. It calls cart-service, s
 
 | Topic | Direction | Purpose |
 | --- | --- | --- |
-| `eventcart.orders.created` | Produces | Notifies inventory-service that an order exists |
+| `eventcart.orders.created` | Produces through outbox | Notifies inventory-service that an order exists |
 | `eventcart.inventory.reserved` | Consumes | Updates order status to `INVENTORY_RESERVED` |
 | `eventcart.inventory.failed` | Consumes | Updates order status to `INVENTORY_FAILED` with a reason |
 | `eventcart.payments.completed` | Consumes | Updates order status to `PAYMENT_COMPLETED` |
@@ -60,6 +62,13 @@ eventcart:orders:idempotency:
 
 The local TTL is configured as `30m` in `application.yml`.
 
+## MongoDB Collections
+
+| Database | Collection | Purpose |
+| --- | --- | --- |
+| `eventcart_order` | `orders` | Stores order snapshots and lifecycle status |
+| `eventcart_order` | `outbox_events` | Stores pending, published, and failed order-created events |
+
 ## Local URLs
 
 | Tool | URL |
@@ -71,4 +80,4 @@ The local TTL is configured as `30m` in `application.yml`.
 
 ## Interview Angle
 
-This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Redis idempotency, Kafka event publishing and consumption, eventual consistency, payment/inventory event choreography, and the consistency risk of saving to MongoDB and publishing to Kafka without an outbox pattern.
+This service demonstrates order ownership, synchronous HTTP calls to another service, MongoDB order snapshots, Redis idempotency, transactional outbox publishing, Kafka event consumption, eventual consistency, customer ownership checks, payment/inventory event choreography, and service-to-service cleanup security.

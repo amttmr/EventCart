@@ -74,7 +74,7 @@ Place order request:
 
 `idempotencyKey` is optional, but recommended. It lets a frontend or API client retry the same order request without accidentally creating a duplicate order.
 
-After the order is created, order-service returns the order with status `CREATED`. The order-created event is stored in the outbox and then published asynchronously. inventory-service processes the Kafka event, payment-service reacts after inventory is reserved, notification-service records customer notifications, and order-service updates the order to `INVENTORY_RESERVED`, `INVENTORY_FAILED`, `PAYMENT_COMPLETED`, or `PAYMENT_FAILED`.
+After the order is created, order-service returns the order with status `CREATED`. The order-created event is stored in the order outbox and then published asynchronously. inventory-service processes the Kafka event, stores its result event in its own outbox, payment-service reacts after inventory is reserved, stores its payment result event in its own outbox, notification-service records customer notifications, and order-service updates the order to `INVENTORY_RESERVED`, `INVENTORY_FAILED`, `PAYMENT_COMPLETED`, or `PAYMENT_FAILED`.
 
 ## Inventory APIs
 
@@ -118,7 +118,7 @@ payment-service creates the payment attempt asynchronously after it consumes `In
 | `GET` | `/api/v1/notifications/{notificationId}` | Fetch one notification |
 | `PUT` | `/api/v1/notifications/{notificationId}/read` | Mark a notification as read |
 
-notification-service creates these records asynchronously from Kafka events.
+notification-service creates these records asynchronously from Kafka events. If configured, it also attempts email/SMS provider delivery after the notification is stored.
 
 ## API Gateway And Security
 
@@ -131,6 +131,8 @@ Use the gateway for security testing because it validates Keycloak JWT tokens an
 | `ADMIN` | Product and inventory management |
 | `CUSTOMER` | Cart, order, and notification APIs |
 | `SUPPORT` | Order, payment, and notification lookup |
+
+Backend services also enforce customer ownership checks. A `CUSTOMER` token must match the requested `customerId` through claims such as `customer_id`; `ADMIN` and `SUPPORT` can inspect customer-scoped lookup APIs.
 
 ## Run Services Locally
 
@@ -195,4 +197,4 @@ You should be able to explain:
 - API documentation should show service boundaries clearly. In this flow, clients do not send product price to cart-service.
 - OpenAPI examples should demonstrate operationally safer requests, such as order placement with an `idempotencyKey`.
 - Some APIs are lookup-only because their data is created asynchronously from Kafka events, such as payment attempts.
-- Gateway security shows role checks at the edge, while backend services still validate JWTs for direct-port access.
+- Gateway security shows role checks at the edge, while backend services still validate JWTs and customer ownership for direct-port access.

@@ -8,24 +8,12 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: eventcart
-      MONGO_INITDB_ROOT_PASSWORD: eventcart
+      MONGO_INITDB_ROOT_USERNAME: ${EVENTCART_MONGO_ROOT_USERNAME:-eventcart}
+      MONGO_INITDB_ROOT_PASSWORD: ${EVENTCART_MONGO_ROOT_PASSWORD:-eventcart}
     volumes:
       - mongodb_data:/data/db
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mongosh",
-          "--username",
-          "eventcart",
-          "--password",
-          "eventcart",
-          "--authenticationDatabase",
-          "admin",
-          "--eval",
-          "db.adminCommand('ping')"
-        ]
+      test: [ "CMD-SHELL", "mongosh --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand('ping')\"" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -81,17 +69,64 @@ services:
       - "8088:8080"
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${EVENTCART_KEYCLOAK_ADMIN_PASSWORD:-admin}
     command: [ "start-dev", "--import-realm" ]
     volumes:
       - ./ops/keycloak:/opt/keycloak/data/import:ro
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin >/dev/null 2>&1" ]
+      test: [ "CMD-SHELL", "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password \"$${KC_BOOTSTRAP_ADMIN_PASSWORD}\" >/dev/null 2>&1" ]
       interval: 15s
       timeout: 10s
       retries: 20
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.157.0
+    container_name: eventcart-otel-collector
+    restart: unless-stopped
+    command: [ "--config=/etc/otelcol/config.yml" ]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    volumes:
+      - ./ops/observability/otel/otel-collector-config.yml:/etc/otelcol/config.yml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    container_name: eventcart-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./ops/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - otel-collector
+
+  grafana:
+    image: grafana/grafana:13.0.1
+    container_name: eventcart-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${EVENTCART_GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${EVENTCART_GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./ops/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
 
 volumes:
   mongodb_data:
   kafka_data:
   redis_data:
+  prometheus_data:
+  grafana_data:

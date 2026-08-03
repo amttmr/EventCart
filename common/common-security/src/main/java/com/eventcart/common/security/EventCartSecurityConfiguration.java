@@ -9,6 +9,7 @@ import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,6 +29,7 @@ import java.util.Collection;
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @ConditionalOnWebApplication(type = Type.SERVLET)
 public class EventCartSecurityConfiguration {
     /**
@@ -35,6 +37,7 @@ public class EventCartSecurityConfiguration {
      *
      * @param http Spring Security HTTP builder
      * @param jwtAuthenticationConverter JWT to authentication converter
+     * @param internalServiceAccessPolicy validator for narrowly scoped internal service calls
      * @return configured security filter chain
      * @throws Exception when Spring Security cannot build the chain
      */
@@ -42,7 +45,8 @@ public class EventCartSecurityConfiguration {
     @ConditionalOnProperty(prefix = "eventcart.security", name = "enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain eventCartSecurityFilterChain(
             HttpSecurity http,
-            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter
+            Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
+            InternalServiceAccessPolicy internalServiceAccessPolicy
     ) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
@@ -56,10 +60,13 @@ public class EventCartSecurityConfiguration {
                                 "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
+                        .requestMatchers(internalServiceAccessPolicy::isAllowedInternalRequest).permitAll()
                         .requestMatchers("/api/v1/products/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/inventory/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/carts/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers("/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/orders/**")
+                        .hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
                         .requestMatchers("/api/v1/payments/**").hasAnyRole("ADMIN", "SUPPORT")
                         .requestMatchers("/api/v1/notifications/**").hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
                         .anyRequest().authenticated()

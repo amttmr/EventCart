@@ -6,6 +6,7 @@ import com.eventcart.notification.service.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -41,6 +42,7 @@ public class NotificationController {
     @Operation(summary = "List customer notifications", description = "Returns notifications created from order and payment events.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Notifications returned")
     @GetMapping("/customers/{customerId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<List<NotificationResponse>> getNotificationsForCustomer(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {

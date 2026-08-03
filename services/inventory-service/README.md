@@ -4,7 +4,7 @@
 
 ## Responsibility
 
-This service consumes `OrderCreatedEvent` from Kafka, checks local inventory stock in MongoDB, reserves stock when possible, and publishes either `InventoryReservedEvent` or `InventoryReservationFailedEvent`. Successful reservation events include the order amount and currency so payment-service can simulate payment without calling order-service. It also consumes `PaymentFailedEvent` to release stock when payment fails.
+This service consumes `OrderCreatedEvent` from Kafka, checks local inventory stock in MongoDB, reserves stock when possible, and stores either `InventoryReservedEvent` or `InventoryReservationFailedEvent` in the MongoDB outbox before Kafka publication. Successful reservation events include the order amount and currency so payment-service can simulate payment without calling order-service. It also consumes `PaymentFailedEvent` to release stock when payment fails.
 
 ## Current Functionality
 
@@ -15,7 +15,8 @@ This service consumes `OrderCreatedEvent` from Kafka, checks local inventory sto
 | Reserve stock | Decreases available quantity and increases reserved quantity |
 | Release stock | Releases reserved quantity back to available stock after payment failure |
 | Reservation result | Stores reservation outcome in MongoDB |
-| Kafka producer | Publishes `InventoryReservedEvent` or `InventoryReservationFailedEvent` |
+| Transactional outbox | Stores inventory result events in `outbox_events` before Kafka publication |
+| Kafka producer | Publishes pending inventory outbox events |
 | Kafka compensation consumer | Consumes `PaymentFailedEvent` from `eventcart.payments.failed` |
 | Payment handoff | Includes amount and currency on `InventoryReservedEvent` for payment-service |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
@@ -55,6 +56,14 @@ Reservation statuses:
 | OpenAPI JSON | `http://localhost:8084/v3/api-docs` |
 | Swagger UI | `http://localhost:8084/swagger-ui.html` |
 
+## MongoDB Collections
+
+| Database | Collection | Purpose |
+| --- | --- | --- |
+| `eventcart_inventory` | `inventory_items` | Stores product stock |
+| `eventcart_inventory` | `inventory_reservations` | Stores reservation results |
+| `eventcart_inventory` | `outbox_events` | Stores pending, published, and failed inventory result events |
+
 ## Interview Angle
 
-This service demonstrates Kafka consumers, asynchronous event handling, idempotency checks, inventory reservation, compensating stock release, eventual consistency, and the need for stronger production patterns such as transactions, retries, dead-letter topics, and the outbox pattern.
+This service demonstrates Kafka consumers, asynchronous event handling, idempotency checks, inventory reservation, compensating stock release, eventual consistency, retries, dead-letter topics, and the transactional outbox pattern for reliable event publishing.

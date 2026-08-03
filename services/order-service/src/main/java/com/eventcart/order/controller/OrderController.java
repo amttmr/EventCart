@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,6 +52,7 @@ public class OrderController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Cart service unavailable")
     })
     @PostMapping
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#request.customerId(), authentication)")
     public ApiResponse<OrderResponse> placeOrder(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Customer whose cart should be converted into an order",
@@ -112,6 +114,7 @@ public class OrderController {
     @Operation(summary = "List customer orders", description = "Returns orders for one customer, newest first.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Orders returned")
     @GetMapping("/customer/{customerId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<List<OrderResponse>> getOrdersForCustomer(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {

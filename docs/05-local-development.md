@@ -45,24 +45,35 @@ Implemented so far:
   - Reserve stock when available.
   - Consume `PaymentFailedEvent` from Kafka.
   - Release reserved stock when payment fails.
-  - Publish `InventoryReservedEvent` or `InventoryReservationFailedEvent`.
+  - Store `InventoryReservedEvent` or `InventoryReservationFailedEvent` in the outbox.
+  - Publish pending inventory outbox events to Kafka.
 - `payment-service`
   - Consume `InventoryReservedEvent` from Kafka.
   - Simulate payment success or failure.
   - Store payment attempts in MongoDB.
-  - Publish `PaymentCompletedEvent` or `PaymentFailedEvent`.
+  - Store `PaymentCompletedEvent` or `PaymentFailedEvent` in the outbox.
+  - Publish pending payment outbox events to Kafka.
 - `notification-service`
   - Consume order, inventory failure, and payment result events from Kafka.
   - Store customer notification history in MongoDB.
+  - Optionally deliver notifications through SMTP email and Twilio-compatible SMS.
 - `api-gateway`
   - Route `/api/v1/**` traffic to backend services.
   - Validate Keycloak JWT tokens and enforce roles.
+- `common-security`
+  - Enforce role-based access and customer ownership checks.
+  - Allow a narrow internal token only for async cart cleanup after inventory reservation.
 - Docker Compose:
   - MongoDB
   - Kafka
   - Redis for order idempotency keys
   - Keycloak
+  - OpenTelemetry Collector
+  - Prometheus
+  - Grafana
 - OpenAPI/Swagger UI for service APIs.
+- Dockerfiles, GitHub Actions CI/CD workflow, Kubernetes manifests, and secret templates.
+- Docker-backed end-to-end tests in `e2e-tests`.
 
 ## Important Java Note
 
@@ -87,6 +98,8 @@ cd C:\Users\HP\Documents\Study\EventCart
 docker compose up -d
 ```
 
+This starts MongoDB, Kafka, Redis, Keycloak, OpenTelemetry Collector, Prometheus, and Grafana.
+
 Check containers:
 
 ```powershell
@@ -104,6 +117,29 @@ Stop containers and remove local volumes:
 ```powershell
 docker compose down -v
 ```
+
+## Local Secrets And Optional Providers
+
+The repository includes `.env.example` with local placeholders for infrastructure passwords, the internal service token, SMTP, and Twilio-compatible SMS credentials.
+
+For normal local learning, the default internal service token in `application.yml` is enough for order-service to clear a cart after inventory reservation. For a production-like run, set a long random value:
+
+```powershell
+$env:EVENTCART_INTERNAL_SERVICE_TOKEN = "replace-with-a-long-random-token"
+```
+
+Email and SMS notifications are disabled by default. Enable them only after setting provider credentials:
+
+```powershell
+$env:SPRING_MAIL_HOST = "smtp.example.com"
+$env:SPRING_MAIL_USERNAME = "smtp-user"
+$env:SPRING_MAIL_PASSWORD = "smtp-password"
+$env:TWILIO_ACCOUNT_SID = "replace-me"
+$env:TWILIO_AUTH_TOKEN = "replace-me"
+$env:TWILIO_FROM_NUMBER = "+15555550100"
+```
+
+Then set `eventcart.notifications.email.enabled=true` or `eventcart.notifications.sms.enabled=true` in `services/notification-service/src/main/resources/application.yml` or pass the equivalent environment-backed configuration for your run profile.
 
 ## Build
 
@@ -160,6 +196,14 @@ Build only the API Gateway and required modules:
 ```powershell
 mvn -pl services/api-gateway -am clean verify
 ```
+
+Run the full Docker-backed platform E2E test:
+
+```powershell
+.\mvnw.cmd -P integration-tests -pl e2e-tests -am verify
+```
+
+This test starts MongoDB, Kafka, and Redis with Testcontainers, launches the service jars, creates a product, seeds inventory, adds a cart item, places an order, and waits for inventory, payment, final order status, and notifications. Docker Desktop must be running; otherwise JUnit skips the Testcontainers test.
 
 ## Run Catalog Service
 
@@ -531,7 +575,7 @@ Invoke-RestMethod -Method Post `
   -Body $body
 ```
 
-When order-service places the order, it stores an idempotency key in Redis and stores `OrderCreatedEvent` in MongoDB collection `outbox_events`. The outbox publisher sends the pending event to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously and creates a reservation result. payment-service consumes successful inventory reservations and creates a payment attempt.
+When order-service places the order, it stores an idempotency key in Redis and stores `OrderCreatedEvent` in MongoDB collection `outbox_events`. The order outbox publisher sends the pending event to Kafka topic `eventcart.orders.created`. inventory-service consumes that event asynchronously, creates a reservation result, and stores the inventory result event in its own `outbox_events` collection. payment-service consumes successful inventory reservations, creates a payment attempt, and stores the payment result event in its own `outbox_events` collection before publishing it.
 
 Check order status by order ID:
 
@@ -551,7 +595,31 @@ Check payment attempt by order ID:
 Invoke-RestMethod "http://localhost:8085/api/v1/payments/orders/<order-id>"
 ```
 
-After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. payment-service then publishes `PaymentCompletedEvent` or `PaymentFailedEvent`, and order-service updates the order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`. If payment fails, inventory-service consumes `PaymentFailedEvent`, releases the reserved stock, and changes the reservation status to `RELEASED`. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
+After inventory is reserved, order-service consumes `InventoryReservedEvent`, updates the order status to `INVENTORY_RESERVED`, and calls cart-service to clear the cart. User-triggered cart reads forward the caller JWT; async cart cleanup uses the internal service token because the Kafka listener has no user HTTP request. payment-service then publishes `PaymentCompletedEvent` or `PaymentFailedEvent` through its outbox, and order-service updates the order status to `PAYMENT_COMPLETED` or `PAYMENT_FAILED`. If payment fails, inventory-service consumes `PaymentFailedEvent`, releases the reserved stock, and changes the reservation status to `RELEASED`. If stock is unavailable, order-service consumes `InventoryReservationFailedEvent`, updates the order status to `INVENTORY_FAILED`, and keeps the failure reason in `statusReason`.
+
+## Observability URLs
+
+After `docker compose up -d`, use these local observability tools:
+
+| Tool | URL |
+| --- | --- |
+| Prometheus | `http://localhost:9090` |
+| Grafana | `http://localhost:3000` |
+| OpenTelemetry OTLP HTTP endpoint | `http://localhost:4318` |
+
+Grafana is provisioned with a Prometheus datasource and an EventCart overview dashboard. Prometheus scrapes the `/actuator/prometheus` endpoint of each locally running service.
+
+## Docker, CI/CD, And Kubernetes
+
+Each service has a Dockerfile under `services/<service>/Dockerfile`. Build from the repository root:
+
+```powershell
+docker build -f services/order-service/Dockerfile -t eventcart/order-service:local .
+```
+
+The GitHub Actions workflow at `.github/workflows/ci.yml` runs unit tests, the integration-test profile, service Docker builds, and GHCR image publishing for version tags.
+
+Kubernetes manifests live in `ops/k8s`. They include namespace, non-secret ConfigMap values, an example Secret, service deployments, health probes, and secret references for MongoDB, notification providers, and the internal service token.
 
 Payment simulation rule:
 
@@ -580,7 +648,7 @@ This first slice covers:
 - Timeout handling and remote-service error mapping.
 - Redis idempotency for safe order-placement retries.
 - Kafka producer basics with `OrderCreatedEvent`.
-- Transactional outbox basics with order-service `outbox_events`.
+- Transactional outbox basics with order-service, inventory-service, and payment-service `outbox_events`.
 - Kafka consumer basics with inventory reservation.
 - Kafka consumer basics with order status updates from inventory result events.
 - Kafka event chaining with payment simulation after inventory reservation.
@@ -588,7 +656,12 @@ This first slice covers:
 - Compensating actions by releasing reserved inventory after payment failure.
 - JWT resource server basics with Keycloak.
 - API Gateway routing and edge authorization.
+- Customer ownership checks using JWT customer claims.
+- Narrow internal service token handling for async backend calls.
 - Correlation IDs, actuator metrics, Prometheus, and tracing basics.
+- OpenTelemetry Collector, Prometheus, and Grafana local observability.
+- Docker image creation, CI/CD workflow basics, Kubernetes manifests, and production-grade secret references.
+- Full platform E2E testing with Testcontainers and bootable service jars.
 - Event-driven workflow and eventual consistency.
 
 ## Spring Boot 4 MongoDB Configuration Note
@@ -622,7 +695,7 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 12. Why does order-service store an order snapshot instead of reading from cart every time?
 13. What problem does Kafka solve between order-service and inventory-service?
 14. Why is idempotency important for Kafka consumers?
-15. What is the outbox pattern, and why does order-service use it before publishing Kafka events?
+15. What is the outbox pattern, and why do order-service, inventory-service, and payment-service use it before publishing Kafka events?
 16. How does Redis-based idempotency protect order creation from duplicate client retries?
 17. Why do we clear the cart after inventory reservation instead of immediately after order creation?
 18. Why does payment-service consume `InventoryReservedEvent` instead of `OrderCreatedEvent`?
@@ -631,3 +704,7 @@ In older Spring Boot versions, many projects used `spring.data.mongodb.uri`. In 
 21. Why should API Gateway authorization not be the only security layer?
 22. How do retry and DLQ handling help Kafka consumers?
 23. What does `X-Correlation-Id` solve in a microservices flow?
+24. Why do customer ownership checks matter even after role-based access passes?
+25. Why should real secrets come from environment variables, CI/CD secret stores, or Kubernetes Secret integrations instead of source code?
+26. What do Prometheus, Grafana, and OpenTelemetry each contribute to observability?
+27. What does a full platform E2E test catch that a unit test or mocked integration test cannot catch?

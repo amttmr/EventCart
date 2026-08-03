@@ -27,13 +27,15 @@ This document defines what EventCart will do, who uses it, and how the main work
 - Update item quantity.
 - Remove item from cart.
 - Clear cart after successful order placement.
-- Use Redis later for fast cart reads or idempotency keys.
+- Enforce customer ownership so one customer cannot operate another customer's cart.
+- Allow a narrowly scoped internal service token for asynchronous order-service cart cleanup.
 
 ### Order
 
 - Place an order from cart.
 - Store order snapshot so product price/name changes do not corrupt old orders.
-- Publish `OrderCreatedEvent`.
+- Store `OrderCreatedEvent` in the transactional outbox before Kafka publishing.
+- Use Redis idempotency keys to make client retries safe.
 - Track order status:
   - `CREATED`
   - `INVENTORY_RESERVED`
@@ -48,14 +50,14 @@ This document defines what EventCart will do, who uses it, and how the main work
 - Maintain available stock per product.
 - Reserve stock when an order is created.
 - Release stock when payment fails or order is cancelled.
-- Publish inventory success/failure events.
+- Store inventory success/failure events in the transactional outbox before Kafka publishing.
 - Demonstrate concurrency and optimistic locking.
 
 ### Payment
 
 - Simulate payment processing.
 - Support success and failure scenarios.
-- Publish payment events.
+- Store payment events in the transactional outbox before Kafka publishing.
 - Demonstrate idempotent event consumption, retries, and dead-letter topics.
 
 ### Notification
@@ -63,7 +65,7 @@ This document defines what EventCart will do, who uses it, and how the main work
 - Consume order, inventory, and payment events.
 - Generate customer notifications.
 - Store notification history in MongoDB.
-- Later, optionally plug in email/SMS providers.
+- Optionally deliver notifications through SMTP email and Twilio-compatible SMS when provider credentials are configured.
 
 ## Main User Flow
 
@@ -74,22 +76,26 @@ This document defines what EventCart will do, who uses it, and how the main work
 5. Customer places order.
 6. Order Service creates order with `CREATED` status.
 7. Order Service stores `OrderCreatedEvent` in the outbox.
-8. Kafka receives `OrderCreatedEvent`.
+8. Order Service outbox publisher sends `OrderCreatedEvent` to Kafka.
 9. Inventory Service consumes the event and reserves stock.
-10. Payment Service processes payment after stock reservation.
-11. Order Service updates order status from later events.
-12. Notification Service stores order updates.
-13. Customer checks order status.
+10. Inventory Service stores the reservation result event in its outbox.
+11. Inventory Service outbox publisher sends the result event to Kafka.
+12. Payment Service processes payment after stock reservation.
+13. Payment Service stores the payment result event in its outbox.
+14. Payment Service outbox publisher sends the result event to Kafka.
+15. Order Service updates order status from later events.
+16. Notification Service stores order updates and optionally delivers email/SMS messages.
+17. Customer checks order status.
 
 ## Kafka Topics
 
 | Topic | Producer | Consumers |
 | --- | --- | --- |
 | `eventcart.orders.created` | Order Service outbox publisher | Inventory Service, Notification Service |
-| `eventcart.inventory.reserved` | Inventory Service | Order Service, Payment Service |
-| `eventcart.inventory.failed` | Inventory Service | Order Service, Notification Service |
-| `eventcart.payments.completed` | Payment Service | Order Service, Notification Service |
-| `eventcart.payments.failed` | Payment Service | Order Service, Inventory Service, Notification Service |
+| `eventcart.inventory.reserved` | Inventory Service outbox publisher | Order Service, Payment Service |
+| `eventcart.inventory.failed` | Inventory Service outbox publisher | Order Service, Notification Service |
+| `eventcart.payments.completed` | Payment Service outbox publisher | Order Service, Notification Service |
+| `eventcart.payments.failed` | Payment Service outbox publisher | Order Service, Inventory Service, Notification Service |
 | `<topic>.dlq` | Error handlers | Developers/Admin diagnostics |
 
 ## MongoDB Collections
@@ -99,8 +105,8 @@ This document defines what EventCart will do, who uses it, and how the main work
 | Catalog Service | `products`, `categories` |
 | Cart Service | `carts` |
 | Order Service | `orders`, `order_audit_logs`, `outbox_events` |
-| Inventory Service | `inventory_items`, `inventory_reservations` |
-| Payment Service | `payment_attempts` |
+| Inventory Service | `inventory_items`, `inventory_reservations`, `outbox_events` |
+| Payment Service | `payment_attempts`, `outbox_events` |
 | Notification Service | `notifications` |
 
 ## How The Finished Application Will Be Used
@@ -148,8 +154,9 @@ http://localhost:8083/swagger-ui.html
 | 9 | Add Notification Service |
 | 10 | Add security with Keycloak and JWT |
 | 11 | Add Kafka retry and DLQ handling |
-| 12 | Add order-service outbox |
+| 12 | Add transactional outbox to order, inventory, and payment services |
 | 13 | Add integration tests with Testcontainers |
-| 14 | Add observability with Actuator, Prometheus, and Micrometer tracing |
-| 15 | Add Kubernetes manifests |
-| 16 | Prepare interview notes and architecture explanation |
+| 14 | Add observability with Actuator, Prometheus, Grafana, and OpenTelemetry |
+| 15 | Add Dockerfiles, CI/CD pipeline, Kubernetes manifests, and secret examples |
+| 16 | Tighten customer ownership checks |
+| 17 | Prepare interview notes and architecture explanation |

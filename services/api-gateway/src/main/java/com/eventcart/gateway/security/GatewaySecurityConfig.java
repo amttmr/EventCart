@@ -46,6 +46,8 @@ public class GatewaySecurityConfig {
                         .pathMatchers("/api/v1/inventory/**").hasRole("ADMIN")
                         .pathMatchers("/api/v1/carts/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .pathMatchers("/api/v1/orders/**").hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
+                        .pathMatchers(HttpMethod.GET, "/api/v1/payments/orders/**")
+                        .hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
                         .pathMatchers("/api/v1/payments/**").hasAnyRole("ADMIN", "SUPPORT")
                         .pathMatchers("/api/v1/notifications/**").hasAnyRole("CUSTOMER", "ADMIN", "SUPPORT")
                         .anyExchange().authenticated()

@@ -10,10 +10,10 @@ import com.eventcart.inventory.domain.InventoryReservationStatus;
 import com.eventcart.inventory.dto.InventoryItemResponse;
 import com.eventcart.inventory.dto.InventoryReservationResponse;
 import com.eventcart.inventory.dto.UpsertInventoryItemRequest;
-import com.eventcart.inventory.event.InventoryEventPublisher;
 import com.eventcart.inventory.exception.InventoryItemNotFoundException;
 import com.eventcart.inventory.exception.InventoryReservationNotFoundException;
 import com.eventcart.inventory.mapper.InventoryMapper;
+import com.eventcart.inventory.outbox.InventoryOutboxService;
 import com.eventcart.inventory.repository.InventoryItemRepository;
 import com.eventcart.inventory.repository.InventoryReservationRepository;
 import org.slf4j.Logger;
@@ -34,7 +34,7 @@ public class InventoryService {
     private final InventoryItemRepository inventoryItemRepository;
     private final InventoryReservationRepository reservationRepository;
     private final InventoryMapper inventoryMapper;
-    private final InventoryEventPublisher eventPublisher;
+    private final InventoryOutboxService outboxService;
 
     /**
      * Creates an inventory service.
@@ -42,18 +42,18 @@ public class InventoryService {
      * @param inventoryItemRepository repository for stock documents
      * @param reservationRepository repository for reservation results
      * @param inventoryMapper mapper between documents, DTOs, and events
-     * @param eventPublisher Kafka publisher for reservation result events
+     * @param outboxService outbox service for reliable reservation result publishing
      */
     public InventoryService(
             InventoryItemRepository inventoryItemRepository,
             InventoryReservationRepository reservationRepository,
             InventoryMapper inventoryMapper,
-            InventoryEventPublisher eventPublisher
+            InventoryOutboxService outboxService
     ) {
         this.inventoryItemRepository = inventoryItemRepository;
         this.reservationRepository = reservationRepository;
         this.inventoryMapper = inventoryMapper;
-        this.eventPublisher = eventPublisher;
+        this.outboxService = outboxService;
     }
 
     /**
@@ -122,7 +122,7 @@ public class InventoryService {
             InventoryReservationDocument failedReservation = saveFailedReservation(event, failureReason.get());
             log.warn("Inventory reservation failed orderId={} reservationId={} reason={}",
                     event.orderId(), failedReservation.getId(), failureReason.get());
-            eventPublisher.publishInventoryFailed(inventoryMapper.toInventoryReservationFailedEvent(failedReservation));
+            outboxService.enqueueInventoryFailed(inventoryMapper.toInventoryReservationFailedEvent(failedReservation));
             return inventoryMapper.toReservationResponse(failedReservation);
         }
 
@@ -138,7 +138,7 @@ public class InventoryService {
         InventoryReservationDocument savedReservation = reservationRepository.save(reservation);
         log.info("Inventory reserved orderId={} reservationId={} itemCount={}",
                 event.orderId(), savedReservation.getId(), savedReservation.getItems().size());
-        eventPublisher.publishInventoryReserved(inventoryMapper.toInventoryReservedEvent(savedReservation));
+        outboxService.enqueueInventoryReserved(inventoryMapper.toInventoryReservedEvent(savedReservation));
         return inventoryMapper.toReservationResponse(savedReservation);
     }
 

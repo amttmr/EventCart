@@ -17,6 +17,8 @@ This service stores a customer's active cart in MongoDB. It lets customers add p
 | Clear cart | Removes all items from the cart |
 | Totals | Calculates total quantity and subtotal |
 | Catalog lookup | Uses Spring RestClient to call catalog-service with timeout and error handling |
+| Ownership checks | Requires the JWT customer claim to match the requested customer ID, unless the caller is admin/support |
+| Internal cleanup | Accepts a configured internal token only for asynchronous order-service cart cleanup |
 | API documentation | Provides OpenAPI JSON and Swagger UI through springdoc |
 
 ## Main APIs
@@ -51,6 +53,10 @@ cart-service fetches `sku`, name, price, currency, and active status from catalo
 | OpenAPI JSON | `http://localhost:8082/v3/api-docs` |
 | Swagger UI | `http://localhost:8082/swagger-ui.html` |
 
+## Security Note
+
+Normal cart APIs require a customer JWT for the same `customerId`. After inventory is reserved, order-service may clear the cart from a Kafka listener where no end-user HTTP request exists. That narrow cleanup path uses `X-EventCart-Internal-Token`, configured by `EVENTCART_INTERNAL_SERVICE_TOKEN`.
+
 ## Interview Angle
 
-This service demonstrates service ownership, cart document modeling, embedded MongoDB documents, DTO validation, idempotent-ish add behavior, synchronous service-to-service communication, timeout/error handling, and separation between product catalog ownership and cart snapshots.
+This service demonstrates service ownership, cart document modeling, embedded MongoDB documents, DTO validation, idempotent-ish add behavior, synchronous service-to-service communication, timeout/error handling, customer ownership security, and separation between product catalog ownership and cart snapshots.

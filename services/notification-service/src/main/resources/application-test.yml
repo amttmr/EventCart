@@ -12,6 +12,17 @@ spring:
 eventcart:
   security:
     enabled: false
+  notifications:
+    email:
+      enabled: false
+      from: noreply@eventcart.local
+    sms:
+      enabled: false
+      account-sid: ""
+      auth-token: ""
+      from-number: ""
+      base-url: https://api.twilio.com
+    contacts: {}
   kafka:
     retry:
       interval-ms: 10

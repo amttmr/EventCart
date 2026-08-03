@@ -33,6 +33,8 @@ http://localhost:8080
 - `CUSTOMER`: cart, order, and notification APIs.
 - `SUPPORT`: order, payment, and notification lookup.
 
+Backend services still enforce direct-port JWT validation and customer ownership checks. The gateway is the first security layer, not the only one.
+
 ## Interview Angle
 
-This module demonstrates API Gateway routing, centralized authorization, cross-cutting observability, and why backend services should still validate tokens even when a gateway exists.
+This module demonstrates API Gateway routing, centralized authorization, cross-cutting observability, and why backend services should still validate tokens and ownership even when a gateway exists.

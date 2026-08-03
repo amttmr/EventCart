@@ -50,6 +50,9 @@ management:
   tracing:
     sampling:
       probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
 
 info:
   app:
@@ -65,6 +68,20 @@ logging:
 eventcart:
   security:
     enabled: true
+  notifications:
+    email:
+      enabled: false
+      from: noreply@eventcart.local
+    sms:
+      enabled: false
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      from-number: ${TWILIO_FROM_NUMBER:}
+      base-url: https://api.twilio.com
+    contacts:
+      customer-1:
+        email: customer1@example.com
+        phone-number: "+15555550101"
   kafka:
     retry:
       interval-ms: 1000

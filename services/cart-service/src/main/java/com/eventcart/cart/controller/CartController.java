@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +49,7 @@ public class CartController {
     @Operation(summary = "Get customer cart", description = "Returns the active cart for a customer, creating an empty cart if one does not exist.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cart returned")
     @GetMapping("/{customerId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<CartResponse> getCart(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {
@@ -69,6 +71,7 @@ public class CartController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "503", description = "Catalog service unavailable")
     })
     @PostMapping("/{customerId}/items")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<CartResponse> addItem(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -120,6 +123,7 @@ public class CartController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Cart item not found")
     })
     @PutMapping("/{customerId}/items/{productId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<CartResponse> updateItemQuantity(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
             @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId,
@@ -169,6 +173,7 @@ public class CartController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Cart item not found")
     })
     @DeleteMapping("/{customerId}/items/{productId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ApiResponse<CartResponse> removeItem(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId,
             @Parameter(description = "Product ID", example = "6a6f2ff6c33ef72269887fec") @PathVariable String productId
@@ -185,6 +190,7 @@ public class CartController {
     @Operation(summary = "Clear cart", description = "Removes all items from the customer cart.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Cart cleared")
     @DeleteMapping("/{customerId}")
+    @PreAuthorize("@customerAccessPolicy.canAccessCustomer(#customerId, authentication)")
     public ResponseEntity<Void> clearCart(
             @Parameter(description = "Customer ID", example = "customer-1") @PathVariable String customerId
     ) {

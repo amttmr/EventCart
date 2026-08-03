@@ -6,7 +6,7 @@ The goal is not only to build a working application, but also to understand the 
 
 ## Current Technology Baseline
 
-As of 2026-08-02, this project currently builds with:
+As of 2026-08-03, this project currently builds with:
 
 | Area | Choice |
 | --- | --- |
@@ -45,12 +45,13 @@ EventCart is developed as a Maven multi-module project:
 | --- | --- |
 | API Gateway | Single entry point for client APIs, routing, JWT validation, and RBAC |
 | Catalog Service | Products, categories, search, inventory-facing product metadata |
-| Cart Service | Customer shopping cart |
+| Cart Service | Customer shopping cart, product snapshots, ownership checks, and internal cart cleanup |
 | Order Service | Order placement, order snapshots, Redis idempotency, outbox event publishing, and inventory/payment-driven status updates |
-| Inventory Service | Stock reservation and inventory reservation result events |
-| Payment Service | Payment simulation and payment events |
-| Notification Service | Async in-app notifications from order and payment events |
+| Inventory Service | Stock reservation, compensation, and outbox-backed inventory result events |
+| Payment Service | Payment simulation and outbox-backed payment events |
+| Notification Service | Async notification history plus optional email/SMS delivery from order and payment events |
 | Common Libraries | Shared events, DTO conventions, exception models, security, Kafka retry/DLQ support, and test utilities |
+| E2E Tests | Docker-backed full-platform tests that launch service jars and verify the order-to-notification flow |
 
 ## Core Business Flow
 
@@ -59,12 +60,14 @@ EventCart is developed as a Maven multi-module project:
 3. Customer places an order. Order Service calls Cart Service and stores an order snapshot.
 4. Order Service stores `OrderCreatedEvent` in the MongoDB outbox.
 5. Order Service outbox scheduler publishes `OrderCreatedEvent` to Kafka.
-6. Inventory Service consumes `OrderCreated`, reserves stock, and publishes `InventoryReserved` or `InventoryReservationFailed`.
-7. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
-8. Payment Service consumes `InventoryReserved`, simulates payment, and publishes `PaymentCompleted` or `PaymentFailed`.
-9. Order Service consumes payment result events and updates final payment/order status.
-10. Inventory Service consumes failed payment events and releases reserved stock.
-11. Notification Service stores customer notifications asynchronously from order and payment events.
+6. Inventory Service consumes `OrderCreated`, reserves stock, and stores `InventoryReserved` or `InventoryReservationFailed` in its outbox.
+7. Inventory Service outbox scheduler publishes the inventory result event to Kafka.
+8. Order Service consumes the inventory result, updates order status, and clears the cart after successful reservation.
+9. Payment Service consumes `InventoryReserved`, simulates payment, and stores `PaymentCompleted` or `PaymentFailed` in its outbox.
+10. Payment Service outbox scheduler publishes the payment result event to Kafka.
+11. Order Service consumes payment result events and updates final payment/order status.
+12. Inventory Service consumes failed payment events and releases reserved stock.
+13. Notification Service stores customer notifications asynchronously and optionally delivers them through configured email/SMS providers.
 
 ## Learning Promise
 
@@ -76,5 +79,6 @@ By the end of this project, you should be able to:
 - Explain eventual consistency, retries, dead-letter topics, idempotency, and the outbox pattern.
 - Secure APIs with JWT and role-based access.
 - Test services using Testcontainers.
+- Write a full-platform E2E test that launches multiple services against Docker-backed infrastructure.
 - Run the full stack locally with Docker Compose.
 - Discuss the project confidently in Java backend and microservices interviews.

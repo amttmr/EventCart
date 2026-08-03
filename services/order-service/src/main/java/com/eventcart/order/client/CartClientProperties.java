@@ -11,12 +11,16 @@ import java.time.Duration;
  * @param baseUrl base URL of cart-service
  * @param connectTimeout maximum time allowed to establish the HTTP connection
  * @param readTimeout maximum time allowed to wait for the HTTP response
+ * @param internalHeaderName header used for asynchronous internal service calls
+ * @param internalToken shared token used when no customer bearer token is available
  */
 @ConfigurationProperties(prefix = "eventcart.clients.cart")
 public record CartClientProperties(
         URI baseUrl,
         Duration connectTimeout,
-        Duration readTimeout
+        Duration readTimeout,
+        String internalHeaderName,
+        String internalToken
 ) {
     /**
      * Creates cart client properties with safe local defaults.
@@ -24,6 +28,8 @@ public record CartClientProperties(
      * @param baseUrl base URL of cart-service
      * @param connectTimeout connection timeout
      * @param readTimeout response timeout
+     * @param internalHeaderName internal token header name
+     * @param internalToken internal service token
      */
     public CartClientProperties {
         if (baseUrl == null) {
@@ -34,6 +40,9 @@ public record CartClientProperties(
         }
         if (readTimeout == null) {
             readTimeout = Duration.ofSeconds(3);
+        }
+        if (internalHeaderName == null || internalHeaderName.isBlank()) {
+            internalHeaderName = "X-EventCart-Internal-Token";
         }
     }
 }

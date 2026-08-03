@@ -9,8 +9,8 @@ import com.eventcart.inventory.domain.InventoryReservationDocument;
 import com.eventcart.inventory.domain.InventoryReservationItemDocument;
 import com.eventcart.inventory.domain.InventoryReservationStatus;
 import com.eventcart.inventory.dto.InventoryReservationResponse;
-import com.eventcart.inventory.event.InventoryEventPublisher;
 import com.eventcart.inventory.mapper.InventoryMapper;
+import com.eventcart.inventory.outbox.InventoryOutboxService;
 import com.eventcart.inventory.repository.InventoryItemRepository;
 import com.eventcart.inventory.repository.InventoryReservationRepository;
 import org.junit.jupiter.api.Test;
@@ -33,12 +33,12 @@ class InventoryServiceTest {
     private final InventoryItemRepository inventoryItemRepository = mock(InventoryItemRepository.class);
     private final InventoryReservationRepository reservationRepository = mock(InventoryReservationRepository.class);
     private final InventoryMapper inventoryMapper = new InventoryMapper();
-    private final InventoryEventPublisher eventPublisher = mock(InventoryEventPublisher.class);
+    private final InventoryOutboxService outboxService = mock(InventoryOutboxService.class);
     private final InventoryService inventoryService = new InventoryService(
             inventoryItemRepository,
             reservationRepository,
             inventoryMapper,
-            eventPublisher
+            outboxService
     );
 
     /**
@@ -64,8 +64,8 @@ class InventoryServiceTest {
         assertThat(response.currency()).isEqualTo("INR");
         assertThat(stock.getAvailableQuantity()).isEqualTo(3);
         assertThat(stock.getReservedQuantity()).isEqualTo(2);
-        verify(eventPublisher).publishInventoryReserved(any());
-        verify(eventPublisher, never()).publishInventoryFailed(any());
+        verify(outboxService).enqueueInventoryReserved(any());
+        verify(outboxService, never()).enqueueInventoryFailed(any());
     }
 
     /**
@@ -89,8 +89,8 @@ class InventoryServiceTest {
         assertThat(stock.getAvailableQuantity()).isEqualTo(1);
         assertThat(stock.getReservedQuantity()).isZero();
         verify(inventoryItemRepository, never()).save(any());
-        verify(eventPublisher).publishInventoryFailed(any());
-        verify(eventPublisher, never()).publishInventoryReserved(any());
+        verify(outboxService).enqueueInventoryFailed(any());
+        verify(outboxService, never()).enqueueInventoryReserved(any());
     }
 
     /**

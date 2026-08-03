@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.CompletableFuture;
+
 /**
  * Publishes payment result events to Kafka.
  */
@@ -41,21 +43,20 @@ public class PaymentEventPublisher {
      *
      * @param event event payload to publish
      */
-    public void publishPaymentCompleted(PaymentCompletedEvent event) {
+    public CompletableFuture<?> publishPaymentCompleted(PaymentCompletedEvent event) {
         log.info("Publishing PaymentCompleted event orderId={} paymentId={} eventId={} topic={}",
                 event.orderId(), event.paymentId(), event.metadata().eventId(), paymentCompletedTopic);
         var future = kafkaTemplate.send(paymentCompletedTopic, event.orderId(), event);
-        if (future != null) {
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish PaymentCompleted event orderId={} paymentId={} topic={}",
-                            event.orderId(), event.paymentId(), paymentCompletedTopic, ex);
-                } else {
-                    log.debug("Published PaymentCompleted event orderId={} paymentId={} topic={}",
-                            event.orderId(), event.paymentId(), paymentCompletedTopic);
-                }
-            });
-        }
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to publish PaymentCompleted event orderId={} paymentId={} topic={}",
+                        event.orderId(), event.paymentId(), paymentCompletedTopic, ex);
+            } else {
+                log.debug("Published PaymentCompleted event orderId={} paymentId={} topic={}",
+                        event.orderId(), event.paymentId(), paymentCompletedTopic);
+            }
+        });
+        return future;
     }
 
     /**
@@ -63,20 +64,19 @@ public class PaymentEventPublisher {
      *
      * @param event event payload to publish
      */
-    public void publishPaymentFailed(PaymentFailedEvent event) {
+    public CompletableFuture<?> publishPaymentFailed(PaymentFailedEvent event) {
         log.info("Publishing PaymentFailed event orderId={} paymentId={} eventId={} topic={}",
                 event.orderId(), event.paymentId(), event.metadata().eventId(), paymentFailedTopic);
         var future = kafkaTemplate.send(paymentFailedTopic, event.orderId(), event);
-        if (future != null) {
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Failed to publish PaymentFailed event orderId={} paymentId={} topic={}",
-                            event.orderId(), event.paymentId(), paymentFailedTopic, ex);
-                } else {
-                    log.debug("Published PaymentFailed event orderId={} paymentId={} topic={}",
-                            event.orderId(), event.paymentId(), paymentFailedTopic);
-                }
-            });
-        }
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Failed to publish PaymentFailed event orderId={} paymentId={} topic={}",
+                        event.orderId(), event.paymentId(), paymentFailedTopic, ex);
+            } else {
+                log.debug("Published PaymentFailed event orderId={} paymentId={} topic={}",
+                        event.orderId(), event.paymentId(), paymentFailedTopic);
+            }
+        });
+        return future;
     }
 }

@@ -2,8 +2,10 @@ package com.eventcart.notification.service;
 
 import com.eventcart.common.events.EventMetadata;
 import com.eventcart.common.events.PaymentFailedEvent;
+import com.eventcart.common.security.CustomerAccessPolicy;
 import com.eventcart.notification.domain.NotificationDocument;
 import com.eventcart.notification.domain.NotificationStatus;
+import com.eventcart.notification.delivery.NotificationDeliveryService;
 import com.eventcart.notification.dto.NotificationResponse;
 import com.eventcart.notification.mapper.NotificationMapper;
 import com.eventcart.notification.repository.NotificationRepository;
@@ -25,7 +27,14 @@ import static org.mockito.Mockito.when;
 class NotificationServiceTest {
     private final NotificationRepository notificationRepository = mock(NotificationRepository.class);
     private final NotificationMapper notificationMapper = new NotificationMapper();
-    private final NotificationService notificationService = new NotificationService(notificationRepository, notificationMapper);
+    private final CustomerAccessPolicy customerAccessPolicy = new CustomerAccessPolicy(false);
+    private final NotificationDeliveryService deliveryService = mock(NotificationDeliveryService.class);
+    private final NotificationService notificationService = new NotificationService(
+            notificationRepository,
+            notificationMapper,
+            customerAccessPolicy,
+            deliveryService
+    );
 
     /**
      * Verifies that duplicate source events do not create duplicate notifications.
@@ -40,6 +49,25 @@ class NotificationServiceTest {
 
         assertThat(response.notificationId()).isEqualTo("notification-1");
         verify(notificationRepository, never()).save(any());
+        verify(deliveryService, never()).deliver(any());
+    }
+
+    /**
+     * Verifies that a newly stored notification is delivered through configured providers.
+     */
+    @Test
+    void recordPaymentFailedShouldDeliverNewNotification() {
+        when(notificationRepository.findBySourceEventId("event-1")).thenReturn(Optional.empty());
+        when(notificationRepository.save(any(NotificationDocument.class))).thenAnswer(invocation -> {
+            NotificationDocument notification = invocation.getArgument(0);
+            notification.setId("notification-1");
+            return notification;
+        });
+
+        NotificationResponse response = notificationService.recordPaymentFailed(paymentFailedEvent());
+
+        assertThat(response.notificationId()).isEqualTo("notification-1");
+        verify(deliveryService).deliver(any(NotificationDocument.class));
     }
 
     /**
