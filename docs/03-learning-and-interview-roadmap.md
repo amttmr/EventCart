@@ -2,6 +2,8 @@
 
 This roadmap connects every implementation phase with the concepts you should be able to explain in an interview.
 
+For deeper preparation, use the [Technology Deep Dives](technology-deep-dives/README.md) while moving through this roadmap. Those documents explain where each technology is used in EventCart, how to verify it locally, how to debug it, and how to discuss it in interviews.
+
 ## Phase 1: Java And Spring Boot Foundation
 
 What we build:
@@ -154,4 +156,3 @@ Interview topics:
 - Explain why MongoDB was used.
 - Explain how failures are handled.
 - Explain how you would scale the system.
-

@@ -36,6 +36,7 @@ Start here:
 9. [Event-Driven Order and Inventory Flow](docs/08-event-driven-order-inventory-flow.md)
 10. [Logging and Debugging](docs/09-logging-and-debugging.md)
 11. [QA and New Joiner Application Flow Guide](docs/10-qa-application-flow.md)
+12. [Technology Deep Dives](docs/technology-deep-dives/README.md)
 
 ## Current Services
 
