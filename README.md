@@ -37,6 +37,9 @@ Start here:
 10. [Logging and Debugging](docs/09-logging-and-debugging.md)
 11. [QA and New Joiner Application Flow Guide](docs/10-qa-application-flow.md)
 12. [Technology Deep Dives](docs/technology-deep-dives/README.md)
+13. [Architecture Documentation](docs/architecture/README.md)
+14. [Architecture Decision Records](docs/decisions/README.md)
+15. [Interview Preparation](docs/interview/README.md)
 
 ## Current Services
 
