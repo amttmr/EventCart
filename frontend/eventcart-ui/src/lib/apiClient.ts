@@ -37,7 +37,22 @@ export async function unwrap<T>(request: Promise<{ data: ApiResponse<T> }>): Pro
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiError>
-    return axiosError.response?.data?.message ?? axiosError.message
+    const status = axiosError.response?.status
+    const backendMessage = axiosError.response?.data?.message
+
+    if (status === 502) {
+      return backendMessage ?? 'API Gateway could not reach the target service. Check gateway and backend service health.'
+    }
+
+    if (status === 503) {
+      return backendMessage ?? 'A backend service is temporarily unavailable. Check service logs and health endpoints.'
+    }
+
+    if (!axiosError.response) {
+      return 'API is unreachable. Check whether the API Gateway is running on http://localhost:8080.'
+    }
+
+    return backendMessage ?? axiosError.message
   }
 
   return error instanceof Error ? error.message : 'Unexpected error'

@@ -151,6 +151,13 @@ Use backend tools:
 - Kafka: verify topic messages and DLQ messages.
 - Grafana/Prometheus: verify service health and request metrics.
 
+Common local UI symptoms:
+
+| Symptom | Meaning |
+| --- | --- |
+| `Error while checking login iframe` | Keycloak's local-dev login iframe check can fail on localhost. The UI disables that iframe check and still refreshes tokens normally. Hard-refresh the page after pulling this fix. |
+| Product search shows `502` | API Gateway or catalog-service is not reachable. Start `api-gateway` on `8080` and `catalog-service` on `8081`, then retry. |
+
 ## Useful Commands
 
 ```powershell

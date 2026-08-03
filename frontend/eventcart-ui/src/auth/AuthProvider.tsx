@@ -31,6 +31,30 @@ const keycloak = appConfig.authEnabled
     })
   : undefined
 
+let keycloakInitPromise: Promise<boolean> | undefined
+
+function initializeKeycloak() {
+  if (!keycloak) {
+    return Promise.resolve(false)
+  }
+
+  if (!keycloakInitPromise) {
+    keycloakInitPromise = keycloak
+      .init({
+        onLoad: 'check-sso',
+        checkLoginIframe: false,
+        pkceMethod: 'S256',
+        silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+      })
+      .catch((error: unknown) => {
+        keycloakInitPromise = undefined
+        throw error
+      })
+  }
+
+  return keycloakInitPromise
+}
+
 function extractRoles(tokenParsed?: Keycloak.KeycloakTokenParsed): string[] {
   const realmRoles = tokenParsed?.realm_access?.roles
   return Array.isArray(realmRoles) ? realmRoles : []
@@ -78,12 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     setAccessTokenProvider(() => keycloak.token)
 
-    keycloak
-      .init({
-        onLoad: 'check-sso',
-        pkceMethod: 'S256',
-        silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
-      })
+    initializeKeycloak()
       .then(() => {
         if (mounted) {
           syncFromKeycloak()
